@@ -1,0 +1,9 @@
+AI4ELAB	http://localhost:8001/feed/MP_WXS_3211834441.rss
+广联达+	http://localhost:8001/feed/MP_WXS_3070281323.rss
+广联达设计圈	http://localhost:8001/feed/MP_WXS_3083183900.rss
+中望软件	http://localhost:8001/feed/MP_WXS_3017250229.rss
+中望软件技术	http://localhost:8001/feed/MP_WXS_2393400861.rss
+酷家乐	http://localhost:8001/feed/MP_WXS_3093538884.rss
+大乐装	http://localhost:8001/feed/MP_WXS_3883566687.rss
+品览Pinlan	http://localhost:8001/feed/MP_WXS_3520915834.rss
+小库科技XKool	http://localhost:8001/feed/MP_WXS_3224648383.rss

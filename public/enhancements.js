@@ -203,9 +203,10 @@ if ('serviceWorker' in navigator) {
    ARTICLE TRANSLATION MODAL
    ══════════════════════════════════════════════════════════════ */
 (function initTranslation() {
-  // Share mode: no auth, skip translation modal
-  if (window.__shareMode) {
-    // Let all external links open normally
+  // 产品当前主要为中文内容，关闭翻译功能时，直接打开原文链接即可
+  const TRANSLATION_ENABLED = false;
+  // Share 模式或翻译关闭：不启用翻译弹窗，所有文章链接直接在新窗口打开
+  if (window.__shareMode || !TRANSLATION_ENABLED) {
     document.addEventListener('digestRendered', () => {
       document.querySelectorAll('.article-card a[href], .top-card a[href]').forEach(link => {
         link.target = '_blank';

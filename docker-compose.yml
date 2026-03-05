@@ -6,12 +6,36 @@ services:
     ports:
       - "127.0.0.1:3456:3456"
     environment:
-      - SITE_PASSWORD=${SITE_PASSWORD:-}
       - CONFIG_SECRET=${CONFIG_SECRET:-}
       - TZ=${TZ:-Asia/Shanghai}
       - PORT=3456
+      - WERSS_BASE_URL=http://we-mp-rss:8001
+      # PDF 中文字体路径（容器内路径，要与 public/fonts 中的文件名对应）
+      - PDF_FONT_PATH=/app/public/fonts/NotoSansSC-VariableFont_wght.ttf
+      - WERSS_DB_PATH=/app/we-mp-rss/data/db.db
+      - WERSS_USERNAME=${WERSS_USERNAME:-admin}
+      - WERSS_PASSWORD=${WERSS_PASSWORD:-admin}
     volumes:
       - ai-daily-data:/app/data
+      - ./we-mp-rss/data:/app/we-mp-rss/data:ro
+    depends_on:
+      - we-mp-rss
+
+  we-mp-rss:
+    image: ghcr.io/rachelos/we-mp-rss:latest
+    container_name: we-mp-rss
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8001:8001"
+    environment:
+      # 限制历史抓取页数，降低被风控风险（默认 5，这里改为 2）
+      - MAX_PAGE=2
+      # 启用 we-mp-rss 内置定时任务（自动抓取订阅号新文章）
+      - ENABLE_JOB=True
+      # 定时任务执行间隔（秒），例如 600=10 分钟；保持默认 10 也可以
+      - SPAN_INTERVAL=600
+    volumes:
+      - ./we-mp-rss/data:/app/data
 
 volumes:
   ai-daily-data:

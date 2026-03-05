@@ -1,0 +1,11 @@
+本地docker中部署的微信公众号rss源抓取工具，rss url：
+http://host.docker.internal:8001/feed/all.rss
+
+外部的rss源：
+
+ENR信息科技：
+https://www.enr.com/rss/topic/168-informationtech
+
+
+Trimble Newsroom：
+https://news.trimble.com/news-releases?category=775&pagetemplate=rss

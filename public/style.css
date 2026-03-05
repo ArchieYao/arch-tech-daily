@@ -123,6 +123,42 @@ body { letter-spacing: -0.01em; background: #ece5d5; }
   align-items: center; justify-content: center;
   gap: 12px; margin-bottom: 22px;
 }
+
+/* 顶部两个主操作按钮：历史报告 / 管理后台 */
+.hero-main-links {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+@media (max-width: 479px) {
+  .hero-main-links {
+    flex-direction: column;
+    width: 100%;
+    max-width: 260px;
+  }
+}
+.hero-main-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 120px;
+  padding: 10px 22px;
+  border-radius: 999px;
+  border: 1px solid rgba(242,236,216,0.28);
+  background: rgba(0,0,0,0.08);
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  text-decoration: none;
+  color: rgba(242,236,216,0.9);
+  cursor: pointer;
+  transition: background 0.18s, border-color 0.18s, transform 0.12s;
+}
+.hero-main-btn:hover {
+  background: rgba(255,255,255,0.08);
+  border-color: rgba(242,236,216,0.45);
+  transform: translateY(-1px);
+}
+
 .hero-icons {
   display: flex; align-items: center; gap: 4px;
 }
@@ -223,6 +259,20 @@ body { letter-spacing: -0.01em; background: #ece5d5; }
     0 16px 48px rgba(30,28,19,0.05);
   border: 1px solid rgba(200,186,158,0.35);
   overflow: hidden;
+}
+
+/* Admin & reports panels — add comfortable inner padding 防止内容贴边 */
+#adminPage .panel,
+#reportsListPage .panel,
+#reportDetailPage .panel {
+  padding: 24px 20px 28px;
+}
+@media (min-width: 640px) {
+  #adminPage .panel,
+  #reportsListPage .panel,
+  #reportDetailPage .panel {
+    padding: 28px 28px 32px;
+  }
 }
 
 /* Panel header — gold left border, tinted header bg */
@@ -609,6 +659,46 @@ body { letter-spacing: -0.01em; background: #ece5d5; }
 }
 .settings-tab:hover { color: #1e1c13; }
 .settings-tab.active { color: #1e1c13; border-bottom-color: #b8902c; }
+
+.admin-tab { font-size: 12px; font-weight: 500; padding: 10px 20px; border: none; background: transparent; cursor: pointer; color: #8a7a62; border-bottom: 2px solid transparent; }
+.admin-tab:hover { color: #1e1c13; }
+.admin-tab.active { color: #1e1c13; border-bottom-color: #b8902c; }
+.dark .admin-tab { color: #5a4e3a; }
+.dark .admin-tab:hover { color: #e8dfc8; }
+.dark .admin-tab.active { color: #e8dfc8; border-bottom-color: #b8902c; }
+
+/* WeRSS (微信公众号 RSS) */
+.werss-status { min-height: 1.5rem; }
+.werss-block .werss-status .text-xs { line-height: 1.5; }
+.werss-search-result { transition: background 0.15s; }
+.werss-mp-avatar { display: block; object-fit: cover; }
+.werss-qr-modal {
+  position: fixed; inset: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: center;
+  padding: 1rem;
+}
+.werss-qr-modal.hidden { display: none !important; }
+.werss-qr-modal-backdrop {
+  position: absolute; inset: 0;
+  background: rgba(0,0,0,0.5);
+  cursor: pointer;
+}
+.werss-qr-modal-content {
+  position: relative; z-index: 1;
+  background: #fdf9f3; border: 1px solid #e2d8c0;
+  border-radius: 12px; padding: 1.25rem;
+  max-width: 320px; width: 100%;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+}
+.dark .werss-qr-modal-content {
+  background: #252219; border-color: #3d3629;
+}
+.werss-qr-image-wrap {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 200px; background: #fff; border-radius: 8px;
+}
+.dark .werss-qr-image-wrap { background: #1a1710; }
+.werss-qr-modal-content .werss-mp-avatar { width: 200px; height: 200px; }
 
 .s-lbl {
   display: block; font-size: 10px; font-weight: 700;

@@ -1,4 +1,4 @@
-let authToken = localStorage.getItem('auth_token') || '';
+let authToken = localStorage.getItem('admin_token') || '';
 let currentDigest = null;
 let currentFilter = 'all';
 let searchQuery = '';
@@ -8,7 +8,409 @@ const CATEGORY_META = {
   'ai-ml': { emoji: '🤖', label: 'AI / ML' }, 'security': { emoji: '🔒', label: '安全' },
   'engineering': { emoji: '⚙️', label: '工程' }, 'tools': { emoji: '🛠', label: '工具' },
   'opinion': { emoji: '💡', label: '观点' }, 'other': { emoji: '📝', label: '其他' },
+  'building-tech': { emoji: '🏗', label: '建筑科技' }, 'policy': { emoji: '📋', label: '政策' }, 'product': { emoji: '📦', label: '产品' },
 };
+
+// --- Router (hash: #/reports, #/reports/YYYY-MM-DD, #/admin) ---
+function getRoute() {
+  const hash = window.location.hash.slice(1) || '/reports';
+  const parts = hash.replace(/^\/+/, '').split('/');
+  if (parts[0] === 'admin') return { view: 'admin' };
+  if (parts[0] === 'reports' && parts[1] && /^\d{4}-\d{2}-\d{2}$/.test(parts[1])) return { view: 'detail', date: parts[1] };
+  return { view: 'list' };
+}
+
+function showView(which) {
+  const listPage = document.getElementById('reportsListPage');
+  const detailPage = document.getElementById('reportDetailPage');
+  const adminPage = document.getElementById('adminPage');
+  const digestPanels = ['highlightsSection', 'statsSection', 'filterSection', 'top3Section', 'divider', 'articleSection', 'emptyState', 'skeletonView', 'statusBanner'];
+  listPage.classList.toggle('hidden', which !== 'list');
+  detailPage.classList.toggle('hidden', which !== 'detail');
+  if (adminPage) adminPage.classList.toggle('hidden', which !== 'admin');
+  digestPanels.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('hidden', which !== 'digest');
+  });
+  document.getElementById('heroDateSelWrap')?.classList.toggle('hidden', which !== 'digest');
+  document.getElementById('generateBtn')?.classList.toggle('hidden', which !== 'digest');
+  document.getElementById('settingsBtn')?.classList.toggle('hidden', which !== 'digest');
+}
+
+async function showReportsList() {
+  showView('list');
+  try {
+    const res = await apiFetch('/api/digests');
+    const data = await res.json();
+    if (!data.ok) return;
+    const list = data.data || [];
+    document.getElementById('reportsListCount').textContent = `共 ${list.length} 份报告`;
+    document.getElementById('reportsList').innerHTML = list.map(d => {
+      const title = (d.report_title || d.date || '未命名').slice(0, 25);
+      const dateLabel = d.date ? `${d.date.slice(0,4)}年${d.date.slice(5,7)}月${d.date.slice(8,10)}日` : d.date;
+      return `<a href="#/reports/${d.date}" class="block p-4 rounded-xl border border-cream-200 dark:border-ink-700 hover:bg-cream-50 dark:hover:bg-ink-900 transition">
+        <h3 class="font-medium text-ink-800 dark:text-cream-100 mb-1">${escapeHtml(title)}</h3>
+        <p class="text-xs text-sand-500">${escapeHtml(dateLabel)}</p>
+      </a>`;
+    }).join('') || '<p class="text-sm text-sand-500">暂无报告</p>';
+  } catch {
+    document.getElementById('reportsList').innerHTML = '<p class="text-sm text-sand-500">加载失败</p>';
+  }
+}
+
+function escapeHtml(s) {
+  if (!s) return '';
+  const div = document.createElement('div');
+  div.textContent = s;
+  return div.innerHTML;
+}
+
+async function showReportDetail(date) {
+  showView('detail');
+  document.getElementById('reportDetailTitle').textContent = '加载中...';
+  document.getElementById('reportDetailArticles').innerHTML = '';
+  try {
+    const res = await apiFetch(`/api/digest/${date}`);
+    const data = await res.json();
+    if (!data.ok) {
+      document.getElementById('reportDetailTitle').textContent = '报告不存在';
+      return;
+    }
+    const d = data.data;
+    const title = d.reportTitle || d.highlights?.slice(0, 25) || date;
+    document.getElementById('reportDetailTitle').textContent = title;
+    document.getElementById('reportDetailDate').textContent = d.date ? `${d.date.slice(0,4)}年${d.date.slice(5,7)}月${d.date.slice(8,10)}日` : date;
+    document.getElementById('reportDetailHighlights').textContent = d.highlights || '暂无核心要点';
+    const articles = d.articles || [];
+    const aiArticles = articles.filter(a => a.source_domain !== 'building');
+    const buildingArticles = articles.filter(a => a.source_domain === 'building');
+    const sources = [...new Set(articles.map(a => a.source_name).filter(Boolean))].join('、');
+    document.getElementById('reportDetailSources').textContent = sources || '—';
+
+    let idx = 1;
+    let html = '';
+
+    if (aiArticles.length) {
+      html += `<div class="mb-2 text-xs font-medium text-sand-600">AI 资讯（${aiArticles.length} 条）</div>`;
+      html += aiArticles.map(a => {
+        const card = `
+        <div class="border-b border-cream-100 dark:border-ink-800 pb-4 last:border-0">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="text-xs font-medium text-gold-600 dark:text-gold-400">${idx}</span>
+            <span class="text-xs text-sand-500">${escapeHtml(a.source_name || '')}</span>
+          </div>
+          <h4 class="font-medium mb-2"><a href="${escapeHtml(a.link)}" target="_blank" rel="noopener" class="hover:underline text-ink-800 dark:text-cream-100">${escapeHtml(a.title_zh || a.title || '')}</a></h4>
+          <p class="text-sm text-sand-600 dark:text-sand-400">${escapeHtml((a.summary || '').slice(0, 300))}${(a.summary && a.summary.length > 300) ? '…' : ''}</p>
+        </div>`;
+        idx += 1;
+        return card;
+      }).join('');
+    }
+
+    if (buildingArticles.length) {
+      html += `<div class="mt-4 mb-2 text-xs font-medium text-sand-600">建筑科技资讯（${buildingArticles.length} 条）</div>`;
+      html += buildingArticles.map(a => {
+        const card = `
+        <div class="border-b border-cream-100 dark:border-ink-800 pb-4 last:border-0">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="text-xs font-medium text-gold-600 dark:text-gold-400">${idx}</span>
+            <span class="text-xs text-sand-500">${escapeHtml(a.source_name || '')}</span>
+          </div>
+          <h4 class="font-medium mb-2"><a href="${escapeHtml(a.link)}" target="_blank" rel="noopener" class="hover:underline text-ink-800 dark:text-cream-100">${escapeHtml(a.title_zh || a.title || '')}</a></h4>
+          <p class="text-sm text-sand-600 dark:text-sand-400">${escapeHtml((a.summary || '').slice(0, 300))}${(a.summary && a.summary.length > 300) ? '…' : ''}</p>
+        </div>`;
+        idx += 1;
+        return card;
+      }).join('');
+    }
+
+    document.getElementById('reportDetailArticles').innerHTML = html || '<p class="text-sm text-sand-500">暂无文章</p>';
+    document.getElementById('downloadPdfBtn').dataset.date = date;
+  } catch {
+    document.getElementById('reportDetailTitle').textContent = '加载失败';
+  }
+}
+
+function route() {
+  const r = getRoute();
+  if (r.view === 'admin') { showAdminView(); return; }
+  if (r.view === 'detail') { showReportDetail(r.date); return; }
+  showReportsList();
+}
+
+async function showAdminView() {
+  showView('admin');
+  const loginBlock = document.getElementById('adminLoginBlock');
+  const mainBlock = document.getElementById('adminMainBlock');
+  if (!loginBlock || !mainBlock) return;
+
+  if (authToken) {
+    try {
+      const res = await fetch('/api/auth/me', { headers: { 'X-Auth-Token': authToken } });
+      const data = await res.json();
+      if (data.ok && data.username) {
+        loginBlock.classList.add('hidden');
+        mainBlock.classList.remove('hidden');
+        document.getElementById('adminUserLabel').textContent = `已登录：${data.username}`;
+        loadAdminConfig();
+        initAdminTabs();
+        return;
+      }
+    } catch {}
+  }
+  authToken = '';
+  localStorage.removeItem('admin_token');
+  loginBlock.classList.remove('hidden');
+  mainBlock.classList.add('hidden');
+  document.getElementById('adminLoginUser')?.focus();
+}
+
+window.addEventListener('hashchange', route);
+
+// --- Admin page ---
+let adminRssSources = [];
+
+function initAdminTabs() {
+  const allTabs = ['adminApiTab', 'adminScheduleTab', 'adminRssTab', 'adminWxmpTab', 'adminPasswordTab'];
+  const tabMap = { api: 'adminApiTab', schedule: 'adminScheduleTab', rss: 'adminRssTab', wxmp: 'adminWxmpTab', password: 'adminPasswordTab' };
+  document.querySelectorAll('.admin-tab').forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll('.admin-tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const tab = btn.dataset.tab;
+      allTabs.forEach(id => { const el = document.getElementById(id); if (el) el.classList.toggle('hidden', id !== tabMap[tab]); });
+      if (tab === 'rss') loadAdminRssList();
+    };
+  });
+}
+
+async function loadAdminConfig() {
+  try {
+    const res = await apiFetch('/api/config');
+    const data = await res.json();
+    if (data.ok && data.data) {
+      const c = data.data;
+      const preset = c.preset || 'doubao';
+      document.querySelectorAll('#adminPresetBtns .preset-btn').forEach(b => b.classList.toggle('active', b.dataset.preset === preset));
+      if (c.apiKeyMasked) document.getElementById('adminCfgApiKey').placeholder = c.apiKeyMasked;
+      document.getElementById('adminCfgBaseURL').value = c.baseURL || '';
+      document.getElementById('adminCfgModel').value = c.model || '';
+      if (c.schedules?.length) {
+        const s = c.schedules[0];
+        document.getElementById('adminScheduleEnabled').checked = !!s.enabled;
+        document.getElementById('adminScheduleHour').value = s.hour ?? 8;
+        document.getElementById('adminScheduleHours').value = s.hours ?? 24;
+        document.getElementById('adminScheduleTopN').value = s.topN ?? 15;
+      }
+    }
+    const rres = await apiFetch('/api/rss-sources');
+    const rdata = await rres.json();
+    if (rdata.ok) adminRssSources = rdata.data.custom?.length ? rdata.data.custom : (rdata.data.default || []);
+  } catch {}
+}
+
+async function loadAdminRssList() {
+  if (adminRssSources.length === 0) {
+    try {
+      const res = await apiFetch('/api/rss-sources');
+      const data = await res.json();
+      if (data.ok) adminRssSources = data.data.custom?.length ? data.data.custom : (data.data.default || []);
+    } catch {}
+  }
+  const list = document.getElementById('adminRssList');
+  if (!list) return;
+  const countEl = document.getElementById('adminRssCount');
+  list.innerHTML = adminRssSources.map((s, i) => {
+    const isBuilding = s.domain === 'building';
+    return `
+    <div class="flex items-center gap-2 p-3 hover:bg-cream-50 dark:hover:bg-ink-900">
+      <div class="flex-1 min-w-0"><div class="text-xs font-medium truncate">${escapeHtml(s.name)}</div><div class="text-[10px] text-sand-500 truncate">${escapeHtml(s.xmlUrl)}</div></div>
+      <select class="rss-domain-sel text-[10px] px-1.5 py-0.5 rounded border border-cream-200 dark:border-ink-700 bg-white dark:bg-ink-900 text-ink-800 dark:text-cream-200" data-index="${i}">
+        <option value="ai" ${isBuilding ? '' : 'selected'}>AI资讯</option>
+        <option value="building" ${isBuilding ? 'selected' : ''}>建筑科技</option>
+      </select>
+      <button type="button" class="text-xs px-2 py-1 rounded text-red-500 hover:bg-red-50 dark:hover:bg-red-950" data-index="${i}">删除</button>
+    </div>`;
+  }).join('');
+  if (countEl) {
+    countEl.textContent = adminRssSources.length ? `（共 ${adminRssSources.length} 个订阅源）` : '（暂无订阅源）';
+  }
+  list.querySelectorAll('select.rss-domain-sel').forEach(sel => {
+    sel.onchange = () => {
+      const idx = parseInt(sel.dataset.index);
+      adminRssSources[idx].domain = sel.value;
+    };
+  });
+  list.querySelectorAll('button[data-index]').forEach(btn => {
+    btn.onclick = () => { adminRssSources.splice(parseInt(btn.dataset.index), 1); loadAdminRssList(); };
+  });
+}
+
+// --- WeRSS export (微信公众号 RSS 清单导出) ---
+let werssExportedList = [];
+
+async function exportWxRssList() {
+  const statusEl = document.getElementById('werssExportStatus');
+  const listEl = document.getElementById('werssExportList');
+  const importBtn = document.getElementById('werssImportAllBtn');
+  if (!listEl) return;
+  statusEl.textContent = '正在读取…';
+  importBtn?.classList.add('hidden');
+  listEl.classList.add('hidden');
+  try {
+    const res = await apiFetch('/api/werss/export');
+    const data = await res.json();
+    if (!data.ok) { statusEl.textContent = data.error || '读取失败'; return; }
+    const list = data.data?.list || [];
+    werssExportedList = list;
+    if (list.length === 0) {
+      statusEl.textContent = '暂无已订阅的公众号，请先到 we-mp-rss 管理界面添加订阅';
+      listEl.innerHTML = '';
+      listEl.classList.add('hidden');
+      return;
+    }
+    statusEl.textContent = `共 ${list.length} 个公众号`;
+    importBtn?.classList.remove('hidden');
+    const existingUrls = new Set(adminRssSources.map(s => s.xmlUrl));
+    listEl.innerHTML = list.map(mp => {
+      const alreadyAdded = existingUrls.has(mp.rssUrl);
+      return `<div class="flex items-center gap-2 p-2.5 hover:bg-cream-50 dark:hover:bg-ink-900">
+        <div class="flex-1 min-w-0">
+          <div class="text-xs font-medium truncate">${escapeHtml(mp.name)}</div>
+          <div class="text-[10px] text-sand-400 dark:text-sand-600 truncate select-all">${escapeHtml(mp.rssUrl)}</div>
+        </div>
+        <button type="button" class="werss-add-one text-xs px-2 py-1 rounded shrink-0 ${alreadyAdded ? 'bg-green-100 dark:bg-green-900/30 text-green-600' : 'bg-gold-500/20 text-gold-600 dark:text-gold-400'}" data-name="${escapeHtml(mp.name)}" data-url="${escapeHtml(mp.rssUrl)}" ${alreadyAdded ? 'disabled' : ''}>${alreadyAdded ? '已添加' : '添加'}</button>
+      </div>`;
+    }).join('');
+    listEl.classList.remove('hidden');
+    listEl.querySelectorAll('.werss-add-one:not([disabled])').forEach(btn => {
+      btn.onclick = () => {
+        adminRssSources.push({ name: btn.dataset.name, xmlUrl: btn.dataset.url, htmlUrl: '', domain: 'building' });
+        loadAdminRssList();
+        btn.textContent = '已添加';
+        btn.disabled = true;
+        btn.classList.remove('bg-gold-500/20', 'text-gold-600', 'dark:text-gold-400');
+        btn.classList.add('bg-green-100', 'dark:bg-green-900/30', 'text-green-600');
+        window.showToast?.(`已添加：${btn.dataset.name}`, 'success');
+      };
+    });
+  } catch (e) {
+    statusEl.textContent = '读取失败: ' + (e.message || '网络错误');
+  }
+}
+
+function importAllWxRss() {
+  if (!werssExportedList.length) return;
+  const existingUrls = new Set(adminRssSources.map(s => s.xmlUrl));
+  let added = 0;
+  for (const mp of werssExportedList) {
+    if (!existingUrls.has(mp.rssUrl)) {
+      adminRssSources.push({ name: mp.name, xmlUrl: mp.rssUrl, htmlUrl: '', domain: 'building' });
+      existingUrls.add(mp.rssUrl);
+      added++;
+    }
+  }
+  if (added > 0) {
+    loadAdminRssList();
+    exportWxRssList();
+    window.showToast?.(`已添加 ${added} 个公众号 RSS 源`, 'success');
+  } else {
+    window.showToast?.('所有公众号 RSS 源已在列表中', 'info');
+  }
+}
+
+document.getElementById('werssExportBtn')?.addEventListener('click', exportWxRssList);
+document.getElementById('werssImportAllBtn')?.addEventListener('click', importAllWxRss);
+
+document.getElementById('adminTestApiBtn')?.addEventListener('click', async () => {
+  const apiKey = document.getElementById('adminCfgApiKey').value.trim();
+  const baseURL = document.getElementById('adminCfgBaseURL').value.trim();
+  const model = document.getElementById('adminCfgModel').value.trim();
+  const preset = document.querySelector('#adminPresetBtns .preset-btn.active')?.dataset?.preset || 'custom';
+  const resultEl = document.getElementById('adminTestResult');
+  if (!apiKey) { resultEl.textContent = '请先输入 API Key'; return; }
+  resultEl.textContent = '测试中...';
+  try {
+    const res = await apiFetch('/api/test-connection', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ preset, apiKey, baseURL, model }) });
+    const data = await res.json();
+    resultEl.textContent = data.ok ? '✅ 连接成功' : `❌ ${data.error || '失败'}`;
+  } catch { resultEl.textContent = '❌ 网络错误'; }
+});
+
+document.getElementById('adminSaveBtn')?.addEventListener('click', async () => {
+  const apiKey = document.getElementById('adminCfgApiKey').value.trim();
+  const baseURL = document.getElementById('adminCfgBaseURL').value.trim();
+  const model = document.getElementById('adminCfgModel').value.trim();
+  const preset = document.querySelector('#adminPresetBtns .preset-btn.active')?.dataset?.preset || 'custom';
+  const scheduleEnabled = document.getElementById('adminScheduleEnabled').checked;
+  const hour = parseInt(document.getElementById('adminScheduleHour').value) || 8;
+  const hours = parseInt(document.getElementById('adminScheduleHours').value) || 24;
+  const topN = parseInt(document.getElementById('adminScheduleTopN').value) || 15;
+  if (!apiKey) { window.showToast?.('请输入 API Key', 'error'); return; }
+  const schedules = scheduleEnabled ? [{ enabled: true, preset, hour, minute: 0, hours, topN, baseURL: (preset === 'custom' || preset === 'doubao') ? baseURL : '', model: (preset === 'custom' || preset === 'doubao') ? model : '' }] : [];
+  try {
+    await apiFetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ preset, apiKey, baseURL, model, schedules }) });
+    await apiFetch('/api/rss-sources', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sources: adminRssSources }) });
+    window.showToast?.('配置已保存', 'success');
+  } catch { window.showToast?.('保存失败', 'error'); }
+});
+
+document.getElementById('adminPresetBtns')?.addEventListener('click', e => {
+  const btn = e.target.closest('.preset-btn');
+  if (!btn) return;
+  document.querySelectorAll('#adminPresetBtns .preset-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  if (btn.dataset.preset === 'doubao') {
+    document.getElementById('adminCfgBaseURL').value = 'https://ark.cn-beijing.volces.com/api/v3';
+    document.getElementById('adminCfgModel').value = 'doubao-seed-1-6-251015';
+  }
+});
+
+document.getElementById('adminTestRssBtn')?.addEventListener('click', async () => {
+  const url = document.getElementById('adminRssUrl').value.trim();
+  const resultEl = document.getElementById('adminRssTestResult');
+  if (!url) return;
+  resultEl.textContent = '测试中...';
+  resultEl.classList.remove('hidden');
+  try {
+    const res = await apiFetch('/api/rss-sources/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ xmlUrl: url }) });
+    const data = await res.json();
+    resultEl.textContent = data.ok ? '✅ RSS 源可访问' : `❌ ${data.error}`;
+  } catch { resultEl.textContent = '❌ 网络错误'; }
+  resultEl.classList.remove('hidden');
+});
+
+document.getElementById('adminAddRssBtn')?.addEventListener('click', () => {
+  const name = document.getElementById('adminRssName').value.trim();
+  const url = document.getElementById('adminRssUrl').value.trim();
+  const domainSel = document.getElementById('adminRssDomain');
+  const domain = domainSel ? domainSel.value : 'ai';
+  if (!name || !url) return;
+  adminRssSources.push({ name, xmlUrl: url, htmlUrl: url.replace(/\/feed.*$/, ''), domain });
+  loadAdminRssList();
+  document.getElementById('adminRssName').value = '';
+  document.getElementById('adminRssUrl').value = '';
+  document.getElementById('adminRssTestResult').classList.add('hidden');
+});
+
+document.getElementById('adminResetRssBtn')?.addEventListener('click', async () => {
+  if (!confirm('确定恢复默认 RSS 源？')) return;
+  try {
+    await apiFetch('/api/rss-sources', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sources: [] }) });
+    adminRssSources = [];
+    const res = await apiFetch('/api/rss-sources');
+    const data = await res.json();
+    if (data.ok) adminRssSources = data.data.default || [];
+    loadAdminRssList();
+  } catch {}
+});
+
+document.getElementById('adminGenerateBtn')?.addEventListener('click', async () => {
+  const res = await apiFetch('/api/digest/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+  const data = await res.json();
+  if (data.ok) { window.showToast?.('已开始生成'); watchStatus(); }
+  else window.showToast?.(data.message || '生成失败', 'error');
+});
 
 // Convert score (0-30) to star rating HTML
 function renderStars(score) {
@@ -51,33 +453,103 @@ document.getElementById('themeToggle').addEventListener('click', () => {
   localStorage.setItem('theme', document.documentElement.classList.contains('dark') ? 'dark' : 'light');
 });
 
-// --- Auth ---
-async function checkAuth() {
-  try {
-    const res = await fetch('/api/auth/status', { headers: { 'X-Auth-Token': authToken } });
-    const data = await res.json();
-    if (data.needsAuth && !data.authenticated) { showLogin(); return false; }
-    showApp(); return true;
-  } catch { showApp(); return true; }
+// --- Admin Auth ---
+function showApp() {
+  document.getElementById('mainApp').classList.remove('hidden');
 }
-function showLogin() { document.getElementById('loginScreen').classList.remove('hidden'); document.getElementById('mainApp').classList.add('hidden'); document.getElementById('loginPassword').focus(); }
-function showApp() { document.getElementById('loginScreen').classList.add('hidden'); document.getElementById('mainApp').classList.remove('hidden'); }
 
-document.getElementById('loginBtn').addEventListener('click', doLogin);
-document.getElementById('loginPassword').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+// Admin login
+document.getElementById('adminLoginBtn')?.addEventListener('click', doAdminLogin);
+document.getElementById('adminLoginPass')?.addEventListener('keydown', e => { if (e.key === 'Enter') doAdminLogin(); });
+document.getElementById('adminLoginUser')?.addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('adminLoginPass')?.focus(); });
 
-async function doLogin() {
-  const pw = document.getElementById('loginPassword').value;
-  if (!pw) return;
-  const errEl = document.getElementById('loginError');
-  errEl.classList.add('hidden');
+async function doAdminLogin() {
+  const username = document.getElementById('adminLoginUser')?.value?.trim();
+  const password = document.getElementById('adminLoginPass')?.value;
+  if (!username || !password) return;
+  const errEl = document.getElementById('adminLoginError');
+  errEl?.classList.add('hidden');
   try {
-    const res = await fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: pw }) });
+    const res = await fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }) });
     const data = await res.json();
-    if (data.ok) { authToken = data.token; localStorage.setItem('auth_token', authToken); showApp(); loadLatest(); loadDigestList(); }
-    else { errEl.textContent = data.message || '密码错误'; errEl.classList.remove('hidden'); document.getElementById('loginPassword').value = ''; }
-  } catch { errEl.textContent = '网络错误'; errEl.classList.remove('hidden'); }
+    if (data.ok) {
+      authToken = data.token;
+      localStorage.setItem('admin_token', authToken);
+      showAdminView();
+    } else {
+      if (errEl) { errEl.textContent = data.message || '用户名或密码错误'; errEl.classList.remove('hidden'); }
+      document.getElementById('adminLoginPass').value = '';
+    }
+  } catch {
+    if (errEl) { errEl.textContent = '网络错误'; errEl.classList.remove('hidden'); }
+  }
 }
+
+// Admin logout
+document.getElementById('adminLogoutBtn')?.addEventListener('click', () => {
+  authToken = '';
+  localStorage.removeItem('admin_token');
+  showAdminView();
+});
+
+// Change password
+document.getElementById('changePwdBtn')?.addEventListener('click', async () => {
+  const oldPwd = document.getElementById('changePwdOld')?.value;
+  const newPwd = document.getElementById('changePwdNew')?.value;
+  const confirmPwd = document.getElementById('changePwdConfirm')?.value;
+  const resultEl = document.getElementById('changePwdResult');
+  if (!resultEl) return;
+  resultEl.classList.add('hidden');
+
+  if (!oldPwd || !newPwd || !confirmPwd) {
+    resultEl.textContent = '请填写所有字段';
+    resultEl.className = 'text-xs text-red-500';
+    resultEl.classList.remove('hidden');
+    return;
+  }
+  if (newPwd !== confirmPwd) {
+    resultEl.textContent = '两次输入的新密码不一致';
+    resultEl.className = 'text-xs text-red-500';
+    resultEl.classList.remove('hidden');
+    return;
+  }
+  if (newPwd.length < 6) {
+    resultEl.textContent = '新密码至少 6 个字符';
+    resultEl.className = 'text-xs text-red-500';
+    resultEl.classList.remove('hidden');
+    return;
+  }
+  try {
+    const res = await apiFetch('/api/auth/change-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ oldPassword: oldPwd, newPassword: newPwd }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      resultEl.textContent = '密码修改成功';
+      resultEl.className = 'text-xs text-green-600';
+      resultEl.classList.remove('hidden');
+      document.getElementById('changePwdOld').value = '';
+      document.getElementById('changePwdNew').value = '';
+      document.getElementById('changePwdConfirm').value = '';
+    } else {
+      resultEl.textContent = data.message || '修改失败';
+      resultEl.className = 'text-xs text-red-500';
+      resultEl.classList.remove('hidden');
+    }
+  } catch {
+    resultEl.textContent = '网络错误';
+    resultEl.className = 'text-xs text-red-500';
+    resultEl.classList.remove('hidden');
+  }
+});
+
+// 公众号管理 - 打开 we-mp-rss
+document.getElementById('openWerssBtn')?.addEventListener('click', () => {
+  const werssUrl = window.location.protocol + '//' + window.location.hostname + ':8001';
+  window.open(werssUrl, '_blank', 'noopener');
+});
 
 function apiFetch(url, opts = {}) { opts.headers = { ...opts.headers, 'X-Auth-Token': authToken }; return fetch(url, opts); }
 
@@ -201,19 +673,20 @@ async function checkSharePage() {
   const path = window.location.pathname;
   const match = path.match(/^\/share\/([a-f0-9]+)$/);
   if (!match) return false;
-  // This is a share page — load public data, no auth needed
   try {
     const res = await fetch(`/api/share/${match[1]}`);
     const data = await res.json();
     if (data.ok) {
-      document.getElementById('loginScreen').classList.add('hidden');
       document.getElementById('mainApp').classList.remove('hidden');
-      // Hide all admin controls in share mode
+      document.getElementById('reportsListPage').classList.add('hidden');
+      document.getElementById('reportDetailPage').classList.add('hidden');
       document.getElementById('generateBtn').classList.add('hidden');
       document.getElementById('settingsBtn').classList.add('hidden');
       document.getElementById('shareBtn').classList.add('hidden');
       document.getElementById('themeToggle').classList.add('hidden');
-      document.getElementById('dateSelect').parentElement.classList.add('hidden'); // Hide date selector row
+      document.getElementById('navReports').classList.add('hidden');
+      document.getElementById('navAdmin').classList.add('hidden');
+      document.getElementById('heroDateSelWrap')?.classList.add('hidden');
       renderDigest(data.data);
       return true;
     }
@@ -252,15 +725,27 @@ async function loadRssSources() {
 
 function renderRssList() {
   const list = document.getElementById('rssList');
-  list.innerHTML = rssSources.map((s, i) => `
+  list.innerHTML = rssSources.map((s, i) => {
+    const isBuilding = s.domain === 'building';
+    return `
     <div class="flex items-center gap-2 p-3 hover:bg-sand-50 dark:hover:bg-ink-950 transition">
       <div class="flex-1 min-w-0">
         <div class="text-xs font-medium truncate">${s.name}</div>
         <div class="text-[10px] text-sand-400 truncate">${s.xmlUrl}</div>
       </div>
+      <select class="modal-domain-sel text-[10px] px-1.5 py-0.5 rounded border border-cream-200 dark:border-ink-700 bg-white dark:bg-ink-900" data-index="${i}">
+        <option value="ai" ${isBuilding ? '' : 'selected'}>AI资讯</option>
+        <option value="building" ${isBuilding ? 'selected' : ''}>建筑科技</option>
+      </select>
       <button class="text-xs px-2 py-1 rounded text-red-500 hover:bg-red-50 dark:hover:bg-red-950 transition" onclick="removeRss(${i})">删除</button>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
+  list.querySelectorAll('select.modal-domain-sel').forEach(sel => {
+    sel.onchange = () => {
+      rssSources[parseInt(sel.dataset.index)].domain = sel.value;
+      saveRssSources();
+    };
+  });
 }
 
 window.removeRss = (index) => {
@@ -315,8 +800,10 @@ document.getElementById('testRssBtn').addEventListener('click', async () => {
 document.getElementById('addRssBtn').addEventListener('click', () => {
   const name = document.getElementById('rssName').value.trim();
   const url = document.getElementById('rssUrl').value.trim();
+  const domainSel = document.getElementById('rssDomainSel');
+  const domain = domainSel ? domainSel.value : 'ai';
   if (!name || !url) return;
-  rssSources.push({ name, xmlUrl: url, htmlUrl: url.replace(/\/feed.*$/, '') });
+  rssSources.push({ name, xmlUrl: url, htmlUrl: url.replace(/\/feed.*$/, ''), domain });
   renderRssList();
   saveRssSources();
   document.getElementById('rssName').value = '';
@@ -538,7 +1025,6 @@ function watchStatus() {
 async function loadDigestList() {
   try {
     const res = await apiFetch('/api/digests');
-    if (res.status === 401) { showLogin(); return; }
     const data = await res.json();
     if (!data.ok) return;
     const sel = document.getElementById('dateSelect');
@@ -550,7 +1036,6 @@ async function loadDigestList() {
 async function loadLatest() {
   try {
     const res = await apiFetch('/api/digest/latest');
-    if (res.status === 401) { showLogin(); return; }
     const data = await res.json();
     if (data.ok) { renderDigest(data.data); loadDigestList(); }
     else document.getElementById('emptyState').classList.remove('hidden');
@@ -567,11 +1052,25 @@ async function checkRunning() {
   try { const res = await apiFetch('/api/status'); const data = await res.json(); if (data.ok && data.data.running) watchStatus(); } catch {}
 }
 
+// PDF：直接下载日报 PDF 文件
+document.getElementById('downloadPdfBtn')?.addEventListener('click', () => {
+  const btn = document.getElementById('downloadPdfBtn');
+  const date = btn?.dataset?.date;
+  if (!date) {
+    window.showToast?.('无法获取报告日期', 'error');
+    return;
+  }
+  const url = `/api/digest/${date}/pdf`;
+  window.showToast?.('正在生成 PDF，如浏览器未自动下载请检查下载栏或弹窗拦截。', 'info');
+  // 直接跳转即可触发下载（服务端使用 Content-Disposition: attachment）
+  window.open(url, '_blank', 'noopener');
+});
+
 (async () => {
-  // Check if this is a share page first (no auth needed)
   const isShare = await checkSharePage();
   if (isShare) return;
-  // Normal auth flow
-  const ok = await checkAuth();
-  if (ok) { loadLatest(); loadDigestList(); checkRunning(); }
+  showApp();
+  if (!window.location.hash || window.location.hash === '#') window.location.hash = '#/reports';
+  route();
+  checkRunning();
 })();

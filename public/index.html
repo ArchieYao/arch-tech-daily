@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI 每日精选</title>
+  <title>建筑科技日报</title>
   <!-- PWA -->
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#1a1710">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="AI精选">
+  <meta name="apple-mobile-web-app-title" content="建筑科技日报">
   <link rel="apple-touch-icon" href="/icon-192.png">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js"></script>
@@ -83,21 +83,6 @@
   </div>
 </div>
 
-<!-- ══ LOGIN ══════════════════════════════════════════════════════ -->
-<div id="loginScreen" class="hidden fixed inset-0 z-50 bg-ink-900 flex items-center justify-center">
-  <div class="text-center px-8 w-full max-w-xs">
-    <div class="login-badge">DAILY INTELLIGENCE</div>
-    <h1 class="login-title">AI 精选</h1>
-    <p class="login-sub">全球 AI 行业精选</p>
-    <div class="space-y-3">
-      <input id="loginPassword" type="password" placeholder="访问密码"
-        class="login-input" autocomplete="current-password">
-      <button id="loginBtn" class="login-btn">进入</button>
-      <p id="loginError" class="hidden text-xs text-red-400 pt-1"></p>
-    </div>
-  </div>
-</div>
-
 <!-- ══ MAIN APP ═══════════════════════════════════════════════════ -->
 <div id="mainApp" class="hidden">
 
@@ -108,16 +93,20 @@
     <div class="hero-inner">
 
       <div class="hero-badge-row">
-        <span class="hero-badge">DAILY INTELLIGENCE</span>
+        <span class="hero-badge">建筑科技日报</span>
       </div>
 
-      <h1 class="hero-title">AI 精选</h1>
-      <p class="hero-tagline">全球 AI 行业精选</p>
+      <h1 class="hero-title">建筑科技日报</h1>
+      <p class="hero-tagline">前沿 AI 与建筑科技资讯</p>
       <p class="hero-date" id="heroDate"></p>
 
       <div class="hero-rule"></div>
 
       <div class="hero-toolbar">
+        <div class="hero-main-links">
+          <a href="#/reports" id="navReports" class="hero-main-btn" title="历史报告">历史报告</a>
+          <a href="#/admin" id="navAdmin" class="hero-main-btn" title="管理后台">管理后台</a>
+        </div>
         <div class="hero-icons">
           <button id="shareBtn"    class="h-ico-btn" title="分享当日日报">
             <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13"/></svg>
@@ -126,14 +115,14 @@
             <svg id="sunIcon"  class="hidden dark:block" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><path stroke-linecap="round" d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
             <svg id="moonIcon" class="block dark:hidden"  width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
           </button>
-          <button id="settingsBtn" class="h-ico-btn" title="设置">
+          <button id="settingsBtn" class="h-ico-btn hidden" title="设置">
             <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" d="M12.22 2h-.44a2 2 0 00-2 2v.18a2 2 0 01-1 1.73l-.43.25a2 2 0 01-2 0l-.15-.08a2 2 0 00-2.73.73l-.22.38a2 2 0 00.73 2.73l.15.1a2 2 0 011 1.72v.51a2 2 0 01-1 1.74l-.15.09a2 2 0 00-.73 2.73l.22.38a2 2 0 002.73.73l.15-.08a2 2 0 012 0l.43.25a2 2 0 011 1.73V20a2 2 0 002 2h.44a2 2 0 002-2v-.18a2 2 0 011-1.73l.43-.25a2 2 0 012 0l.15.08a2 2 0 002.73-.73l.22-.39a2 2 0 00-.73-2.73l-.15-.08a2 2 0 01-1-1.74v-.5a2 2 0 011-1.74l.15-.09a2 2 0 00.73-2.73l-.22-.38a2 2 0 00-2.73-.73l-.15.08a2 2 0 01-2 0l-.43-.25a2 2 0 01-1-1.73V4a2 2 0 00-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
           </button>
         </div>
-        <button id="generateBtn" class="h-gen-btn">✦ 生成日报</button>
+        <button id="generateBtn" class="h-gen-btn hidden">✦ 生成日报</button>
       </div>
 
-      <div class="hero-date-sel-wrap">
+      <div class="hero-date-sel-wrap hidden" id="heroDateSelWrap">
         <select id="dateSelect" class="hero-date-sel"></select>
       </div>
 
@@ -207,6 +196,197 @@
       </div>
     </div>
 
+    <!-- ── 历史报告列表页 ─────────────────────────────────────── -->
+    <section id="reportsListPage" class="hidden">
+      <div class="panel">
+        <h2 class="text-lg font-semibold text-ink-800 dark:text-cream-100 mb-4">历史报告</h2>
+        <p id="reportsListCount" class="text-xs text-sand-500 mb-4"></p>
+        <div id="reportsList" class="space-y-3"></div>
+      </div>
+    </section>
+
+    <!-- ── 报告详情页 ─────────────────────────────────────────── -->
+    <section id="reportDetailPage" class="hidden">
+      <div class="panel">
+        <a href="#/reports" id="backToReports" class="inline-flex items-center gap-2 text-sm text-gold-600 dark:text-gold-400 hover:underline mb-6">← 返回报告列表</a>
+        <h1 id="reportDetailTitle" class="text-xl font-semibold text-ink-800 dark:text-cream-100 mb-2"></h1>
+        <p id="reportDetailDate" class="text-xs text-sand-500 mb-6"></p>
+        <div class="mb-6">
+          <h3 class="text-sm font-medium text-ink-700 dark:text-cream-200 mb-2">核心要点</h3>
+          <p id="reportDetailHighlights" class="text-sm leading-relaxed text-sand-600 dark:text-sand-400 whitespace-pre-wrap"></p>
+        </div>
+        <div class="mb-6">
+          <h3 class="text-sm font-medium text-ink-700 dark:text-cream-200 mb-2">详细资讯</h3>
+          <div id="reportDetailArticles" class="space-y-4"></div>
+        </div>
+        <div class="mb-6">
+          <h3 class="text-sm font-medium text-ink-700 dark:text-cream-200 mb-2">资讯来源</h3>
+          <p id="reportDetailSources" class="text-xs text-sand-500"></p>
+        </div>
+        <div class="pt-4 border-t border-cream-200 dark:border-ink-700">
+          <button id="downloadPdfBtn" class="px-4 py-2 rounded-lg bg-gold-500/20 text-gold-600 dark:text-gold-400 hover:bg-gold-500/30 transition text-sm font-medium">下载 PDF</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 管理后台页 ─────────────────────────────────────────── -->
+    <section id="adminPage" class="hidden">
+      <!-- 管理员登录区域 -->
+      <div id="adminLoginBlock" class="panel">
+        <a href="#/reports" class="inline-flex items-center gap-2 text-sm text-gold-600 dark:text-gold-400 hover:underline mb-6">← 返回报告列表</a>
+        <h2 class="text-lg font-semibold text-ink-800 dark:text-cream-100 mb-4">管理后台登录</h2>
+        <div class="max-w-sm mx-auto space-y-4 py-6">
+          <div>
+            <label class="s-lbl">用户名</label>
+            <input id="adminLoginUser" type="text" placeholder="请输入用户名" class="s-inp w-full" autocomplete="username">
+          </div>
+          <div>
+            <label class="s-lbl">密码</label>
+            <input id="adminLoginPass" type="password" placeholder="请输入密码" class="s-inp w-full" autocomplete="current-password">
+          </div>
+          <button id="adminLoginBtn" class="m-btn-pri w-full">登录</button>
+          <p id="adminLoginError" class="hidden text-xs text-red-500 text-center"></p>
+        </div>
+      </div>
+      <!-- 管理后台主体（登录后显示） -->
+      <div id="adminMainBlock" class="panel hidden">
+        <div class="flex items-center justify-between mb-4">
+          <a href="#/reports" class="inline-flex items-center gap-2 text-sm text-gold-600 dark:text-gold-400 hover:underline">← 返回报告列表</a>
+          <div class="flex items-center gap-3">
+            <span id="adminUserLabel" class="text-xs text-sand-500"></span>
+            <button id="adminLogoutBtn" class="text-xs text-red-500 hover:text-red-600 transition">退出登录</button>
+          </div>
+        </div>
+        <h2 class="text-lg font-semibold text-ink-800 dark:text-cream-100 mb-4">管理后台</h2>
+        <div class="flex flex-wrap border-b border-cream-200 dark:border-ink-700 mb-5">
+          <button class="admin-tab active" data-tab="api">大模型 API</button>
+          <button class="admin-tab" data-tab="schedule">每日自动生成</button>
+          <button class="admin-tab" data-tab="rss">RSS 订阅源</button>
+          <button class="admin-tab" data-tab="wxmp">公众号管理</button>
+          <button class="admin-tab" data-tab="password">修改密码</button>
+        </div>
+        <div id="adminApiTab" class="admin-tab-content space-y-5">
+          <div>
+            <label class="s-lbl">API 渠道</label>
+            <div id="adminPresetBtns" class="grid grid-cols-3 gap-2">
+              <button class="preset-btn" data-preset="doubao"><span class="text-xs font-medium">豆包 Doubao</span></button>
+              <button class="preset-btn" data-preset="custom"><span class="text-xs font-medium">OpenAI</span></button>
+            </div>
+          </div>
+          <div>
+            <label class="s-lbl">API Key</label>
+            <input id="adminCfgApiKey" type="password" placeholder="输入 API Key" class="s-inp w-full">
+          </div>
+          <div>
+            <label class="s-lbl">Base URL（可选）</label>
+            <input id="adminCfgBaseURL" type="text" placeholder="https://api.openai.com/v1" class="s-inp w-full">
+          </div>
+          <div>
+            <label class="s-lbl">模型 ID</label>
+            <input id="adminCfgModel" type="text" placeholder="gpt-4o-mini" class="s-inp w-full">
+          </div>
+          <div class="flex gap-2">
+            <button id="adminTestApiBtn" class="test-btn">测试连接</button>
+            <span id="adminTestResult" class="text-xs text-sand-500 self-center"></span>
+          </div>
+        </div>
+        <div id="adminScheduleTab" class="admin-tab-content hidden space-y-4">
+          <div class="flex items-center justify-between">
+            <label class="text-sm font-medium">每日自动生成</label>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input id="adminScheduleEnabled" type="checkbox" class="sr-only peer">
+              <div class="w-10 h-5 bg-cream-300 dark:bg-ink-700 peer-checked:bg-gold-500 rounded-full after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-5"></div>
+            </label>
+          </div>
+          <div class="grid grid-cols-3 gap-3">
+            <div><label class="s-lbl">每天几点</label><input id="adminScheduleHour" type="number" min="0" max="23" value="8" class="s-inp w-full"></div>
+            <div><label class="s-lbl">时间范围</label><select id="adminScheduleHours" class="s-inp w-full"><option value="24">过去 24 小时</option><option value="48">过去 48 小时</option><option value="168">过去一周</option></select></div>
+            <div><label class="s-lbl">精选数量</label><select id="adminScheduleTopN" class="s-inp w-full"><option value="10">10</option><option value="15" selected>15</option><option value="20">20</option></select></div>
+          </div>
+        </div>
+        <div id="adminRssTab" class="admin-tab-content hidden space-y-4">
+          <div class="werss-block space-y-3">
+            <p class="text-sm font-medium text-ink-800 dark:text-cream-100">
+              微信公众号 RSS 源
+              <span id="adminRssCount" class="ml-2 text-[11px] font-normal text-sand-500"></span>
+            </p>
+            <p class="text-xs text-sand-500">从 <a href="http://localhost:8001" target="_blank" class="underline hover:text-gold-600">we-mp-rss 管理界面</a> 订阅公众号后，点击下方按钮一键导出 RSS 清单。</p>
+            <div class="flex gap-2 flex-wrap items-center">
+              <button type="button" id="werssExportBtn" class="px-3 py-2 rounded-lg bg-gold-500/20 text-gold-600 dark:text-gold-400 text-sm shrink-0">导出公众号 RSS 清单</button>
+              <button type="button" id="werssImportAllBtn" class="px-3 py-2 rounded-lg border border-cream-200 dark:border-ink-700 hover:bg-cream-50 dark:hover:bg-ink-900 text-sm shrink-0 hidden">全部添加到 RSS 源</button>
+              <span id="werssExportStatus" class="text-xs text-sand-500"></span>
+            </div>
+            <div id="werssExportList" class="border border-cream-200 dark:border-ink-700 rounded-xl max-h-64 overflow-y-auto divide-y divide-cream-100 dark:divide-ink-800 hidden"></div>
+          </div>
+          <div class="pt-3 border-t border-cream-200 dark:border-ink-700">
+            <p class="text-sm font-medium text-ink-800 dark:text-cream-100 mb-2">手动添加 RSS 源</p>
+            <p class="text-xs text-sand-500">源名称 + RSS URL，可测试后添加。</p>
+            <div class="flex gap-2 flex-wrap mt-2 items-center">
+              <input id="adminRssName" type="text" placeholder="源名称" class="s-inp flex-1 min-w-[100px]">
+              <input id="adminRssUrl" type="text" placeholder="RSS URL" class="s-inp flex-1 min-w-[160px]">
+              <select id="adminRssDomain" class="s-inp text-xs px-2 py-2 w-auto min-w-[80px]">
+                <option value="ai">AI资讯</option>
+                <option value="building">建筑科技</option>
+              </select>
+              <button id="adminTestRssBtn" class="test-btn shrink-0">测试</button>
+              <button id="adminAddRssBtn" class="px-3 py-2 rounded-lg bg-gold-500/20 text-gold-600 dark:text-gold-400 text-sm shrink-0">添加</button>
+            </div>
+            <p id="adminRssTestResult" class="text-xs hidden"></p>
+            <div class="border border-cream-200 dark:border-ink-700 rounded-xl max-h-64 overflow-y-auto mt-2">
+              <div id="adminRssList" class="divide-y divide-cream-100 dark:divide-ink-800"></div>
+            </div>
+            <button id="adminResetRssBtn" class="text-sm py-2 px-4 rounded-lg border border-cream-200 dark:border-ink-700 hover:bg-cream-50 dark:hover:bg-ink-900 transition mt-2">恢复默认源</button>
+          </div>
+        </div>
+        <!-- 公众号管理 tab -->
+        <div id="adminWxmpTab" class="admin-tab-content hidden space-y-4">
+          <p class="text-sm font-medium text-ink-800 dark:text-cream-100">微信公众号管理</p>
+          <p class="text-xs text-sand-500 leading-relaxed">
+            通过 we-mp-rss 管理微信公众号订阅，在其中搜索并添加公众号，生成 RSS 订阅源后可导入到日报系统。
+          </p>
+          <div class="bg-cream-50 dark:bg-ink-900 rounded-xl p-4 space-y-2">
+            <p class="text-xs text-sand-600 dark:text-sand-400">
+              <strong>默认登录账号：</strong>admin
+            </p>
+            <p class="text-xs text-sand-600 dark:text-sand-400">
+              <strong>默认登录密码：</strong>admin@123
+            </p>
+          </div>
+          <button id="openWerssBtn" class="m-btn-pri">打开公众号管理后台 ↗</button>
+        </div>
+
+        <!-- 修改密码 tab -->
+        <div id="adminPasswordTab" class="admin-tab-content hidden space-y-4">
+          <p class="text-sm font-medium text-ink-800 dark:text-cream-100">修改管理员密码</p>
+          <div class="max-w-sm space-y-3">
+            <div>
+              <label class="s-lbl">当前密码</label>
+              <input id="changePwdOld" type="password" placeholder="请输入当前密码" class="s-inp w-full" autocomplete="current-password">
+            </div>
+            <div>
+              <label class="s-lbl">新密码</label>
+              <input id="changePwdNew" type="password" placeholder="至少 6 个字符" class="s-inp w-full" autocomplete="new-password">
+            </div>
+            <div>
+              <label class="s-lbl">确认新密码</label>
+              <input id="changePwdConfirm" type="password" placeholder="再次输入新密码" class="s-inp w-full" autocomplete="new-password">
+            </div>
+            <button id="changePwdBtn" class="m-btn-pri">保存新密码</button>
+            <p id="changePwdResult" class="hidden text-xs"></p>
+          </div>
+        </div>
+
+        <div class="flex gap-2 mt-6 pt-5 border-t border-cream-200 dark:border-ink-700">
+          <button id="adminSaveBtn" class="m-btn-pri">保存配置</button>
+          <a href="#/reports" class="m-btn-sec inline-block text-center">返回</a>
+        </div>
+        <div class="mt-4 pt-4 border-t border-cream-200 dark:border-ink-700">
+          <p class="text-xs text-sand-500 mb-2">手动生成一期日报</p>
+          <button id="adminGenerateBtn" class="h-gen-btn">✦ 生成日报</button>
+        </div>
+      </div><!-- /adminMainBlock -->
+    </section>
+
     <!-- ── PANEL 1 : 今日日报 ─────────────────────────────────── -->
     <section id="highlightsSection" class="hidden">
       <div class="panel">
@@ -249,6 +429,15 @@
           </button>
           <button class="cat-btn" data-cat="ai-ml">
             <span class="cat-ic">⬡</span><span class="cat-nm">AI / ML</span>
+          </button>
+          <button class="cat-btn" data-cat="building-tech">
+            <span class="cat-ic">🏗</span><span class="cat-nm">建筑科技</span>
+          </button>
+          <button class="cat-btn" data-cat="policy">
+            <span class="cat-ic">📋</span><span class="cat-nm">政策</span>
+          </button>
+          <button class="cat-btn" data-cat="product">
+            <span class="cat-ic">📦</span><span class="cat-nm">产品</span>
           </button>
           <button class="cat-btn" data-cat="security">
             <span class="cat-ic">◉</span><span class="cat-nm">安全</span>
@@ -307,8 +496,8 @@
     <div class="footer-inner">
       <div class="footer-rule"></div>
       <div class="footer-gem">✦</div>
-      <h2 class="footer-title">AI 精选</h2>
-      <p class="footer-sub">全球 AI 行业精选</p>
+      <h2 class="footer-title">建筑科技日报</h2>
+      <p class="footer-sub">前沿 AI 与建筑科技资讯</p>
       <p class="footer-meta">每日自动更新 · 增强版深度内容</p>
       <div class="footer-nav">
         <span>行业新闻</span><span class="footer-dot">·</span>
@@ -375,9 +564,13 @@
 
     <div id="rssTab" class="settings-tab-content hidden space-y-4">
       <p class="text-xs text-cream-500 leading-relaxed">管理 RSS 订阅源。默认使用 90 个精选源，可添加自定义源。</p>
-      <div class="flex gap-2">
+      <div class="flex gap-2 flex-wrap">
         <input id="rssName" type="text" placeholder="源名称" class="s-inp flex-1 min-w-0">
         <input id="rssUrl"  type="text" placeholder="RSS URL"  class="s-inp flex-1 min-w-0">
+        <select id="rssDomainSel" class="s-inp text-xs px-2 py-2 w-auto min-w-[80px]">
+          <option value="ai">AI资讯</option>
+          <option value="building">建筑科技</option>
+        </select>
         <button id="testRssBtn" class="test-btn shrink-0">测试</button>
         <button id="addRssBtn" class="text-xs px-3 py-2 rounded-lg bg-gold-500/10 text-gold-600 hover:bg-gold-500/20 transition shrink-0">添加</button>
       </div>
