@@ -551,6 +551,44 @@ document.getElementById('openWerssBtn')?.addEventListener('click', () => {
   window.open(werssUrl, '_blank', 'noopener');
 });
 
+// 公众号管理 - 一键刷新所有公众号
+document.getElementById('refreshAllMpsBtn')?.addEventListener('click', async () => {
+  const btn = document.getElementById('refreshAllMpsBtn');
+  const resultEl = document.getElementById('refreshMpsResult');
+  btn.disabled = true;
+  btn.textContent = '正在刷新...';
+  resultEl.classList.remove('hidden');
+  resultEl.innerHTML = '<p>正在获取公众号列表并逐个刷新，请稍候...</p>';
+  try {
+    const res = await apiFetch('/api/werss/refresh', { method: 'POST' });
+    const data = await res.json();
+    if (data.ok) {
+      const d = data.data;
+      let html = `<p><strong>刷新完成：</strong>共 ${d.total} 个公众号，成功更新 ${d.updated} 个</p>`;
+      if (d.results?.length) {
+        html += '<div class="mt-2 space-y-0.5">';
+        for (const r of d.results) {
+          const icon = r.ok ? '✓' : '✗';
+          const color = r.ok ? 'text-green-600' : 'text-red-500';
+          html += `<p class="${color}">${icon} ${r.name || r.mpId}${r.error ? ' — ' + r.error : ''}</p>`;
+        }
+        html += '</div>';
+      }
+      resultEl.innerHTML = html;
+      window.showToast?.(`刷新完成：${d.updated}/${d.total} 个公众号`, 'success');
+    } else {
+      resultEl.innerHTML = `<p class="text-red-500">刷新失败：${data.error || '未知错误'}</p>`;
+      window.showToast?.(data.error || '刷新失败', 'error');
+    }
+  } catch (e) {
+    resultEl.innerHTML = `<p class="text-red-500">请求失败：${e.message}</p>`;
+    window.showToast?.('网络错误', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '一键刷新所有公众号';
+  }
+});
+
 function apiFetch(url, opts = {}) { opts.headers = { ...opts.headers, 'X-Auth-Token': authToken }; return fetch(url, opts); }
 
 // --- Time ---

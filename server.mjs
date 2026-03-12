@@ -9,7 +9,7 @@ import { summarizeArticles } from './lib/summarize.mjs';
 import { generateHighlights, generateReportTitle } from './lib/highlights.mjs';
 import { saveDigest, saveArticles, getDigest, getDigestList, setDigestStatus, setDigestHighlights, getStats, createShareToken, getDigestByShareToken, saveRssSources, getRssSources, saveTranslation, getTranslation, getTranslationMap, deleteTranslation, pruneTranslations } from './lib/db.mjs';
 import { authMiddleware, initDefaultAdmin, verifyUser, verifySession, getSessionUser, changePassword, getClientIp, isLocked, getRemainingLockTime } from './lib/auth.mjs';
-import { saveApiConfig, loadApiConfig, API_PRESETS } from './lib/config.mjs';
+import { saveApiConfig, loadApiConfig, loadApiConfigOrInit, API_PRESETS } from './lib/config.mjs';
 import { translateArticle, translateArticleStream, batchTranslateArticles } from './lib/translate.mjs';
 import { WeRSSClient } from './lib/werss-client.mjs';
 import { readFileSync, existsSync } from 'fs';
@@ -222,7 +222,7 @@ app.post('/api/rss-sources/test', asyncHandler(async (req, res) => {
 // --- we-mp-rss proxy (WeChat MP RSS) ---
 const WERSS_BASE_URL = process.env.WERSS_BASE_URL || 'http://localhost:8001';
 const WERSS_USERNAME = process.env.WERSS_USERNAME || 'admin';
-const WERSS_PASSWORD = process.env.WERSS_PASSWORD || 'admin';
+const WERSS_PASSWORD = process.env.WERSS_PASSWORD || 'admin@123';
 let werssJwtCache = { token: null, expiresAt: 0 };
 const WERSS_JWT_BUFFER_MS = 60_000;
 
@@ -411,44 +411,14 @@ app.get('/api/werss/export', asyncHandler(async (req, res) => {
   }
 }));
 
-// 手动触发 we-mp-rss 中已启用的消息任务，刷新订阅号文章
+// 手动刷新所有公众号最新文章（通过 WeRSSClient 逐个触发更新）
 async function handleWeRssRefresh(req, res) {
   try {
     const token = await getWeRSSToken();
-    const base = WERSS_BASE_URL.replace(/\/$/, '');
-    const headers = { Authorization: `Bearer ${token}` };
-
-    // 1) 获取已启用的消息任务列表（status=1）
-    const listResp = await fetch(`${base}/api/message_tasks?status=1&limit=50&offset=0`, { headers });
-    if (!listResp.ok) {
-      return res.json({ ok: false, error: `message_tasks 请求失败: HTTP ${listResp.status}` });
-    }
-    const listJson = await listResp.json().catch(() => ({}));
-    const tasks = listJson.data?.list || listJson.data || [];
-    if (!Array.isArray(tasks) || tasks.length === 0) {
-      return res.json({ ok: false, error: '未找到已启用的消息任务，请先在 we-mp-rss 后台配置“消息任务”' });
-    }
-
-    // 2) 依次执行每个任务的 /run 接口
-    let totalFeeds = 0;
-    const results = [];
-    for (const t of tasks) {
-      const id = t.id || t.task_id;
-      if (!id) continue;
-      const runResp = await fetch(`${base}/api/message_tasks/${id}/run?isTest=false`, { headers });
-      const runJson = await runResp.json().catch(() => ({}));
-      const data = runJson.data || {};
-      const updated = typeof data.count === 'number' ? data.count : (data.mps?.count || 0);
-      totalFeeds += updated || 0;
-      results.push({
-        id,
-        name: t.name || '',
-        updated: updated || 0,
-        ok: runJson.code === 0 || runJson.ok === true,
-      });
-    }
-
-    res.json({ ok: true, data: { totalFeeds, tasks: results } });
+    const client = getWeRSSClient();
+    const result = await client.refreshAllMps(token);
+    console.log(`[werss/refresh] 刷新完成: ${result.updated}/${result.total} 个公众号`);
+    res.json({ ok: true, data: result });
   } catch (e) {
     console.error('[werss/refresh] error:', e);
     res.json({ ok: false, error: e.message || String(e) });
@@ -516,9 +486,31 @@ function setupSchedules(config) {
   });
 }
 
-// Restore schedules on startup
-const savedConfig = loadApiConfig();
+// Restore schedules on startup (首次启动时自动初始化默认配置)
+const savedConfig = loadApiConfigOrInit();
 if (savedConfig) setupSchedules(savedConfig);
+
+// ── 每日凌晨 0:00 自动刷新所有公众号文章 ─────────────────────────
+let lastMpsRefreshDate = '';
+const mpsRefreshTimer = setInterval(async () => {
+  const now = new Date();
+  const h = now.getHours(), m = now.getMinutes();
+  const todayKey = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
+  if (h === 0 && m === 0 && lastMpsRefreshDate !== todayKey) {
+    lastMpsRefreshDate = todayKey;
+    console.log(`[mps-refresh] 开始每日凌晨自动刷新所有公众号 (${now.toISOString()})`);
+    try {
+      const token = await getWeRSSToken();
+      const client = getWeRSSClient();
+      const result = await client.refreshAllMps(token);
+      console.log(`[mps-refresh] 刷新完成: ${result.updated}/${result.total} 个公众号`);
+    } catch (e) {
+      console.error(`[mps-refresh] 刷新失败: ${e.message}`);
+    }
+  }
+}, 60000);
+scheduleTimers.push(mpsRefreshTimer);
+console.log('[mps-refresh] 已启用每日 00:00 自动刷新所有公众号');
 
 // Prune old translations on startup (keep 30 days)
 setImmediate(() => {

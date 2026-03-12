@@ -14,7 +14,7 @@ services:
       - PDF_FONT_PATH=/app/public/fonts/NotoSansSC-VariableFont_wght.ttf
       - WERSS_DB_PATH=/app/we-mp-rss/data/db.db
       - WERSS_USERNAME=${WERSS_USERNAME:-admin}
-      - WERSS_PASSWORD=${WERSS_PASSWORD:-admin}
+      - WERSS_PASSWORD=${WERSS_PASSWORD:-admin@123}
     volumes:
       - ai-daily-data:/app/data
       - ./we-mp-rss/data:/app/we-mp-rss/data:ro

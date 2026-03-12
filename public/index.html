@@ -352,7 +352,11 @@
               <strong>默认登录密码：</strong>admin@123
             </p>
           </div>
-          <button id="openWerssBtn" class="m-btn-pri">打开公众号管理后台 ↗</button>
+          <div class="flex flex-wrap gap-3">
+            <button id="openWerssBtn" class="m-btn-pri">打开公众号管理后台 ↗</button>
+            <button id="refreshAllMpsBtn" class="m-btn-pri" style="background:#d4a850;border-color:#d4a850;">一键刷新所有公众号</button>
+          </div>
+          <div id="refreshMpsResult" class="hidden mt-3 p-3 bg-cream-50 dark:bg-ink-900 rounded-xl text-xs text-sand-600 dark:text-sand-400 space-y-1"></div>
         </div>
 
         <!-- 修改密码 tab -->
