@@ -222,6 +222,7 @@ app.post('/api/rss-sources/test', asyncHandler(async (req, res) => {
 // --- we-mp-rss proxy (WeChat MP RSS) ---
 const WERSS_BASE_URL = process.env.WERSS_BASE_URL || 'http://localhost:8001';
 const WERSS_USERNAME = process.env.WERSS_USERNAME || 'admin';
+// we-mp-rss 服务的默认密码（这是 we-mp-rss 项目自身的默认值，非个人密码）
 const WERSS_PASSWORD = process.env.WERSS_PASSWORD || 'admin@123';
 let werssJwtCache = { token: null, expiresAt: 0 };
 const WERSS_JWT_BUFFER_MS = 60_000;
