@@ -568,8 +568,10 @@ document.getElementById('changePwdBtn')?.addEventListener('click', async () => {
 });
 
 // 公众号管理 - 打开 we-mp-rss
+// we-mp-rss 容器内为明文 HTTP，无 TLS；主站为 https 时若用 location.protocol 会打开 https://host:8001 导致证书/协议错误。
+// 公网是否可达 8001 取决于 docker ports（是否 0.0.0.0）与安全组，或由 Nginx 反代到子路径/子域名。
 document.getElementById('openWerssBtn')?.addEventListener('click', () => {
-  const werssUrl = window.location.protocol + '//' + window.location.hostname + ':8001';
+  const werssUrl = `http://${window.location.hostname}:8001`;
   window.open(werssUrl, '_blank', 'noopener');
 });
 
