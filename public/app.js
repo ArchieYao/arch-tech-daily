@@ -1141,7 +1141,10 @@ document.getElementById('downloadPdfBtn')?.addEventListener('click', () => {
   const isShare = await checkSharePage();
   if (isShare) return;
   showApp();
-  if (!window.location.hash || window.location.hash === '#') window.location.hash = '#/reports';
+  // 用 replaceState 静默设置 hash，避免触发 hashchange 导致 route() 双重执行
+  if (!window.location.hash || window.location.hash === '#') {
+    history.replaceState(null, '', '#/reports');
+  }
   route();
   checkRunning();
 })();
