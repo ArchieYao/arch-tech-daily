@@ -65,32 +65,17 @@ window.showToast = function(message, type = 'info', sub = '') {
    ══════════════════════════════════════════════════════════════ */
 (function initSkeleton() {
   const skeleton = document.getElementById('skeletonView');
-  const mainApp  = document.getElementById('mainApp');
-  if (!skeleton || !mainApp) return;
+  if (!skeleton) return;
 
-  // Show skeleton when app becomes visible, until digest renders
-  let shown = false;
-  const maybeShow = () => {
-    if (shown) return;
-    if (!mainApp.classList.contains('hidden')) {
-      shown = true;
-      skeleton.classList.remove('hidden');
-    }
-  };
-  const observer = new MutationObserver(maybeShow);
-  observer.observe(mainApp, { attributes: true, attributeFilter: ['class'] });
-  maybeShow(); // check immediately
+  // 不再在 mainApp 显示时自动展示骨架：默认路由为 #/reports（历史列表），
+  // route() 会先隐藏骨架，但 MutationObserver 回调会在之后再次显示骨架，且列表页不会触发 digestRendered，导致骨架长期压在列表上方。
 
-  // Hide skeleton once content is ready
+  // 仍监听日报渲染/空状态，确保骨架保持隐藏（分享页等路径若曾显示过可收回）
   document.addEventListener('digestRendered', () => {
     skeleton.classList.add('hidden');
-    observer.disconnect();
   });
-
-  // Also hide if empty state shown
   document.addEventListener('emptyStateShown', () => {
     skeleton.classList.add('hidden');
-    observer.disconnect();
   });
 })();
 

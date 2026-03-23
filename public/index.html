@@ -134,8 +134,8 @@
   ──────────────────────────────────────────────────────────────── -->
   <main class="page-body">
 
-    <!-- Skeleton loading view -->
-    <div id="skeletonView" class="hidden flex flex-col">
+    <!-- Skeleton loading view：仅保留 hidden，勿与 Tailwind flex 同写（会覆盖 display:none，骨架会始终可见）；展开时由 style.css #skeletonView:not(.hidden) 负责 flex 布局 -->
+    <div id="skeletonView" class="hidden">
       <!-- skel panel 1 -->
       <div class="skel-section">
         <div class="panel">

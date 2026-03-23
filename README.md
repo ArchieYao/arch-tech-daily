@@ -71,6 +71,17 @@ docker compose up -d
 
 等待镜像拉取完成后，访问 `http://localhost:3456`。
 
+### 腾讯云 / 生产服务器更新部署
+
+在服务器项目目录执行 `git pull`（或同步代码）后：
+
+```bash
+docker compose down
+docker compose up -d --build
+```
+
+安全组需放行对外端口（与 `docker-compose.yml` 中 `ports` 一致），更新后建议硬刷新浏览器避免缓存旧前端。**更完整的说明与排查**见 `开发与优化记录.md` **第十一节**（含现象、根因与检查项）。
+
 ### 第四步：配置 AI 渠道
 
 1. 用默认账号登录（admin / admin123）

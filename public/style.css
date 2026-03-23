@@ -857,7 +857,11 @@ body { letter-spacing: -0.01em; background: #ece5d5; }
 /* ══════════════════════════════════════════════════════════════════
    SKELETON LOADING
    ══════════════════════════════════════════════════════════════════ */
-#skeletonView { gap: 0; }
+/* 默认隐藏：与 Tailwind CDN 并存时，仅靠 .hidden 可能被其它工具类覆盖 display */
+#skeletonView {
+  gap: 0;
+  display: none !important;
+}
 .skel-section {
   max-width: 700px; width: 100%;
   margin-left: auto; margin-right: auto;
