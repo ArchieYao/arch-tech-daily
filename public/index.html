@@ -268,10 +268,13 @@
         <div id="adminApiTab" class="admin-tab-content space-y-5">
           <div>
             <label class="s-lbl">API 渠道</label>
-            <div id="adminPresetBtns" class="grid grid-cols-3 gap-2">
+            <div id="adminPresetBtns" class="grid grid-cols-2 gap-2">
               <button class="preset-btn" data-preset="doubao"><span class="text-xs font-medium">豆包 Doubao</span></button>
-              <button class="preset-btn" data-preset="custom"><span class="text-xs font-medium">OpenAI</span></button>
+              <button class="preset-btn" data-preset="minimax"><span class="text-xs font-medium">MiniMax</span></button>
+              <button class="preset-btn" data-preset="openai"><span class="text-xs font-medium">OpenAI</span></button>
+              <button class="preset-btn" data-preset="custom"><span class="text-xs font-medium">自定义</span></button>
             </div>
+            <p id="adminPresetHint" class="text-[10px] text-sand-400 dark:text-sand-600 mt-1.5"></p>
           </div>
           <div>
             <label class="s-lbl">API Key</label>
@@ -528,10 +531,12 @@
     <div id="apiTab" class="settings-tab-content space-y-5">
       <div>
         <label class="s-lbl">API 渠道</label>
-        <div id="presetBtns" class="grid grid-cols-3 gap-2">
+        <div id="presetBtns" class="grid grid-cols-2 gap-2">
           <button class="preset-btn" data-preset="gemini"><span class="text-xs font-medium">Google Gemini</span><span class="text-[9px] text-cream-400 mt-0.5">gemini-2.0-flash</span></button>
           <button class="preset-btn" data-preset="doubao"><span class="text-xs font-medium">豆包 Doubao</span><span class="text-[9px] text-cream-400 mt-0.5">doubao-seed</span></button>
-          <button class="preset-btn" data-preset="custom"><span class="text-xs font-medium">自定义</span><span class="text-[9px] text-cream-400 mt-0.5">OpenAI 兼容</span></button>
+          <button class="preset-btn" data-preset="openai"><span class="text-xs font-medium">OpenAI</span><span class="text-[9px] text-cream-400 mt-0.5">gpt-4o-mini</span></button>
+          <button class="preset-btn" data-preset="minimax"><span class="text-xs font-medium">MiniMax</span><span class="text-[9px] text-cream-400 mt-0.5">MiniMax-M2.7</span></button>
+          <button class="preset-btn col-span-2" data-preset="custom"><span class="text-xs font-medium">自定义</span><span class="text-[9px] text-cream-400 mt-0.5">任意 OpenAI 兼容 API</span></button>
         </div>
       </div>
       <div>

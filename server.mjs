@@ -7,7 +7,7 @@ import { fetchAllFeeds } from './lib/feeds.mjs';
 import { scoreArticles } from './lib/scoring.mjs';
 import { summarizeArticles } from './lib/summarize.mjs';
 import { generateHighlights, generateReportTitle } from './lib/highlights.mjs';
-import { saveDigest, saveArticles, getDigest, getDigestList, setDigestStatus, setDigestHighlights, getStats, createShareToken, getDigestByShareToken, saveRssSources, getRssSources, saveTranslation, getTranslation, getTranslationMap, deleteTranslation, pruneTranslations } from './lib/db.mjs';
+import { saveDigest, saveArticles, getDigest, getDigestList, setDigestStatus, setDigestHighlights, getStats, createShareToken, getDigestByShareToken, saveRssSources, getRssSources, saveTranslation, getTranslation, getTranslationMap, deleteTranslation, pruneTranslations, pruneOldDigests } from './lib/db.mjs';
 import { authMiddleware, initDefaultAdmin, verifyUser, verifySession, getSessionUser, changePassword, getClientIp, isLocked, getRemainingLockTime } from './lib/auth.mjs';
 import { saveApiConfig, loadApiConfig, loadApiConfigOrInit, API_PRESETS } from './lib/config.mjs';
 import { translateArticle, translateArticleStream, batchTranslateArticles } from './lib/translate.mjs';
@@ -382,6 +382,14 @@ app.get('/api/werss/mps', asyncHandler(async (req, res) => {
 
 // --- WeRSS export: read SQLite DB directly ---
 const WERSS_DB_PATH = process.env.WERSS_DB_PATH || join(__dirname, 'we-mp-rss', 'data', 'db.db');
+let _sqlJsCache = null;
+async function getSqlJs() {
+  if (!_sqlJsCache) {
+    const { default: initSqlJs } = await import('sql.js');
+    _sqlJsCache = await initSqlJs();
+  }
+  return _sqlJsCache;
+}
 
 app.get('/api/werss/export', asyncHandler(async (req, res) => {
   try {
@@ -389,8 +397,7 @@ app.get('/api/werss/export', asyncHandler(async (req, res) => {
     if (!existsSync(WERSS_DB_PATH)) {
       return res.json({ ok: false, error: '未找到 we-mp-rss 数据库文件 (' + WERSS_DB_PATH + ')，请确认 we-mp-rss 已启动且数据目录已挂载' });
     }
-    const { default: initSqlJs } = await import('sql.js');
-    const SQL = await initSqlJs();
+    const SQL = await getSqlJs();
     const buf = readFileSync(WERSS_DB_PATH);
     const db = new SQL.Database(buf);
     const rows = db.exec("SELECT id, mp_name, mp_cover, mp_intro FROM feeds WHERE status = 1 ORDER BY created_at");
@@ -513,11 +520,26 @@ const mpsRefreshTimer = setInterval(async () => {
 scheduleTimers.push(mpsRefreshTimer);
 console.log('[mps-refresh] 已启用每日 00:00 自动刷新所有公众号');
 
-// Prune old translations on startup (keep 30 days)
+// Prune old data on startup (keep 30 days)
 setImmediate(() => {
+  pruneOldDigests(30);
   const pruned = pruneTranslations(30);
   if (pruned > 0) console.log(`[translate] Pruned ${pruned} expired translations`);
 });
+
+// ── 内存监控：每 10 分钟打印内存使用情况 ──────────────────────────
+setInterval(() => {
+  const mem = process.memoryUsage();
+  const rss = (mem.rss / 1024 / 1024).toFixed(1);
+  const heap = (mem.heapUsed / 1024 / 1024).toFixed(1);
+  const heapTotal = (mem.heapTotal / 1024 / 1024).toFixed(1);
+  console.log(`[memory] RSS: ${rss}MB | Heap: ${heap}/${heapTotal}MB | SSE clients: ${sseClients.size} | Rate limit entries: ${rateLimitMap.size}`);
+  // 当内存超过 1.2GB 时主动触发 GC（需配合 --expose-gc 启动参数）
+  if (mem.rss > 1.2 * 1024 * 1024 * 1024 && typeof global.gc === 'function') {
+    console.warn('[memory] RSS > 1.2GB, forcing garbage collection...');
+    global.gc();
+  }
+}, 600_000);
 
 // Static files with cache control
 app.use(express.static(join(__dirname, 'public'), {
@@ -528,11 +550,12 @@ app.use(express.static(join(__dirname, 'public'), {
 
 // --- SSE for real-time progress ---
 const sseClients = new Set();
+const SSE_MAX_AGE_MS = 30 * 60 * 1000; // 30 分钟超时自动断开
 
 function broadcastState(state) {
   const data = JSON.stringify(state);
-  for (const res of sseClients) {
-    try { res.write(`data: ${data}\n\n`); } catch { sseClients.delete(res); }
+  for (const client of sseClients) {
+    try { client.res.write(`data: ${data}\n\n`); } catch { sseClients.delete(client); }
   }
 }
 
@@ -540,6 +563,17 @@ function updateGenerationState(patch) {
   Object.assign(generationState, patch);
   broadcastState(generationState);
 }
+
+// 定期清理超时的 SSE 连接
+setInterval(() => {
+  const now = Date.now();
+  for (const client of sseClients) {
+    if (now - client.connectedAt > SSE_MAX_AGE_MS) {
+      try { client.res.end(); } catch {}
+      sseClients.delete(client);
+    }
+  }
+}, 60_000);
 
 app.get('/api/status/stream', (req, res) => {
   res.writeHead(200, {
@@ -549,8 +583,9 @@ app.get('/api/status/stream', (req, res) => {
     'X-Accel-Buffering': 'no',
   });
   res.write(`data: ${JSON.stringify(generationState)}\n\n`);
-  sseClients.add(res);
-  req.on('close', () => sseClients.delete(res));
+  const client = { res, connectedAt: Date.now() };
+  sseClients.add(client);
+  req.on('close', () => sseClients.delete(client));
 });
 
 // --- Digest routes ---

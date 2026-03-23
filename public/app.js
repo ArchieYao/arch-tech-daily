@@ -192,6 +192,8 @@ async function loadAdminConfig() {
       const c = data.data;
       const preset = c.preset || 'doubao';
       document.querySelectorAll('#adminPresetBtns .preset-btn').forEach(b => b.classList.toggle('active', b.dataset.preset === preset));
+      const hintEl = document.getElementById('adminPresetHint');
+      if (hintEl) hintEl.textContent = PRESET_HINTS[preset] || '';
       if (c.apiKeyMasked) document.getElementById('adminCfgApiKey').placeholder = c.apiKeyMasked;
       document.getElementById('adminCfgBaseURL').value = c.baseURL || '';
       document.getElementById('adminCfgModel').value = c.model || '';
@@ -347,7 +349,9 @@ document.getElementById('adminSaveBtn')?.addEventListener('click', async () => {
   const hours = parseInt(document.getElementById('adminScheduleHours').value) || 24;
   const topN = parseInt(document.getElementById('adminScheduleTopN').value) || 15;
   if (!apiKey) { window.showToast?.('请输入 API Key', 'error'); return; }
-  const schedules = scheduleEnabled ? [{ enabled: true, preset, hour, minute: 0, hours, topN, baseURL: (preset === 'custom' || preset === 'doubao') ? baseURL : '', model: (preset === 'custom' || preset === 'doubao') ? model : '' }] : [];
+  const needsBaseURL = ['custom', 'doubao', 'openai'].includes(preset);
+  const needsModel = ['custom', 'doubao', 'openai', 'minimax'].includes(preset);
+  const schedules = scheduleEnabled ? [{ enabled: true, preset, hour, minute: 0, hours, topN, baseURL: needsBaseURL ? baseURL : '', model: needsModel ? model : '' }] : [];
   try {
     await apiFetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ preset, apiKey, baseURL, model, schedules }) });
     await apiFetch('/api/rss-sources', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sources: adminRssSources }) });
@@ -358,11 +362,25 @@ document.getElementById('adminSaveBtn')?.addEventListener('click', async () => {
 document.getElementById('adminPresetBtns')?.addEventListener('click', e => {
   const btn = e.target.closest('.preset-btn');
   if (!btn) return;
+  const preset = btn.dataset.preset;
   document.querySelectorAll('#adminPresetBtns .preset-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
-  if (btn.dataset.preset === 'doubao') {
+  const hintEl = document.getElementById('adminPresetHint');
+  if (hintEl) hintEl.textContent = PRESET_HINTS[preset] || '';
+  if (preset === 'doubao') {
     document.getElementById('adminCfgBaseURL').value = 'https://ark.cn-beijing.volces.com/api/v3';
     document.getElementById('adminCfgModel').value = 'doubao-seed-1-6-251015';
+  } else if (preset === 'minimax') {
+    document.getElementById('adminCfgBaseURL').value = '';
+    document.getElementById('adminCfgModel').value = 'MiniMax-M2.7';
+  } else if (preset === 'openai') {
+    document.getElementById('adminCfgBaseURL').value = 'https://api.openai.com/v1';
+    document.getElementById('adminCfgModel').value = 'gpt-4o-mini';
+  } else if (preset === 'custom') {
+    document.getElementById('adminCfgBaseURL').value = '';
+    document.getElementById('adminCfgModel').value = '';
+    document.getElementById('adminCfgBaseURL').placeholder = 'https://your-api-provider.com/v1';
+    document.getElementById('adminCfgModel').placeholder = '输入模型 ID';
   }
 });
 
@@ -430,12 +448,16 @@ function renderStars(score) {
 const PRESET_HINTS = {
   gemini: '免费获取: aistudio.google.com/apikey',
   doubao: '获取: console.volcengine.com/ark',
-  custom: '填入你的 OpenAI 兼容服务 Key',
+  openai: '获取: platform.openai.com/api-keys',
+  minimax: '获取: platform.minimaxi.com/user-center/basic-information',
+  custom: '填入任意 OpenAI 兼容服务的 API Key',
 };
 
 const API_PRESETS = {
   gemini: { name: 'Google Gemini' },
   doubao: { name: '豆包 Doubao' },
+  openai: { name: 'OpenAI' },
+  minimax: { name: 'MiniMax' },
   custom: { name: '自定义' },
 };
 
@@ -891,14 +913,25 @@ function selectPreset(preset) {
   selectedPreset = preset;
   document.querySelectorAll('.preset-btn').forEach(b => b.classList.toggle('active', b.dataset.preset === preset));
   document.getElementById('cfgApiKeyHint').textContent = PRESET_HINTS[preset] || '';
-  document.getElementById('customFields').classList.toggle('hidden', preset !== 'custom' && preset !== 'doubao');
-  // Pre-fill base URL for doubao
+  const showCustom = preset === 'custom' || preset === 'doubao' || preset === 'minimax' || preset === 'openai';
+  document.getElementById('customFields').classList.toggle('hidden', !showCustom);
+  // Pre-fill base URL / model for known presets
   if (preset === 'doubao') {
     const base = document.getElementById('cfgBaseURL');
     const model = document.getElementById('cfgModel');
     if (!base.value) base.value = 'https://ark.cn-beijing.volces.com/api/v3';
     if (!model.value) model.value = 'doubao-seed-1-6-251015';
-    document.getElementById('customFields').classList.remove('hidden');
+  } else if (preset === 'minimax') {
+    const model = document.getElementById('cfgModel');
+    if (!model.value) model.value = 'MiniMax-M2.7';
+  } else if (preset === 'openai') {
+    const base = document.getElementById('cfgBaseURL');
+    const model = document.getElementById('cfgModel');
+    if (!base.value) base.value = 'https://api.openai.com/v1';
+    if (!model.value) model.value = 'gpt-4o-mini';
+  } else if (preset === 'custom') {
+    document.getElementById('cfgBaseURL').placeholder = 'https://your-api-provider.com/v1';
+    document.getElementById('cfgModel').placeholder = '输入模型 ID';
   }
 }
 
@@ -968,8 +1001,8 @@ document.getElementById('settingsSave').addEventListener('click', async () => {
     minute: 0,
     hours: parseInt(document.getElementById('cfgScheduleHours').value) || 48,
     topN: parseInt(document.getElementById('cfgScheduleTopN').value) || 15,
-    baseURL: selectedPreset === 'custom' || selectedPreset === 'doubao' ? baseURL : '',
-    model: selectedPreset === 'custom' || selectedPreset === 'doubao' ? model : '',
+    baseURL: ['custom', 'doubao', 'openai'].includes(selectedPreset) ? baseURL : '',
+    model: ['custom', 'doubao', 'openai', 'minimax'].includes(selectedPreset) ? model : '',
   }] : [];
 
   if (!apiKey) {

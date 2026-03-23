@@ -26,4 +26,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
   CMD node -e "import('http').then(h=>h.get('http://localhost:3456/health',r=>{process.exit(r.statusCode===200?0:1)}))"
 
 # Use dumb-init for proper signal handling (alpine has it)
-CMD ["node", "server.mjs"]
+CMD ["node", "--max-old-space-size=768", "--expose-gc", "server.mjs"]
