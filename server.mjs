@@ -87,10 +87,7 @@ app.get('/api/site-meta', (req, res) => {
   res.json({ ok: true, data: { werssUiUrl } });
 });
 
-// Auth middleware (after public routes)
-app.use(authMiddleware);
-
-// 必须在 authMiddleware 之后注册：该路径在 lib/auth.mjs 中已列入白名单（否则会因 /api/werss/ 前缀被误判为需登录）
+// 必须放在 authMiddleware 之前：先匹配路由再进中间件，避免任何误判为需登录
 app.get('/api/werss/open-ui', (req, res) => {
   const custom = (process.env.WERSS_UI_URL || '').trim();
   if (custom) {
@@ -108,6 +105,9 @@ app.get('/api/werss/open-ui', (req, res) => {
   const hostname = (host.split(':')[0] || req.hostname || 'localhost').trim() || 'localhost';
   res.redirect(302, `http://${hostname}:8001`);
 });
+
+// Auth middleware (after public routes)
+app.use(authMiddleware);
 
 // --- Auth routes ---
 app.get('/api/auth/status', (req, res) => {
