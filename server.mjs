@@ -80,6 +80,12 @@ app.get('/api/share/:token', (req, res) => {
   res.json({ ok: true, data: publicData });
 });
 
+// 前端「打开公众号管理后台」用：we-mp-rss 仅 HTTP。主站若开 HSTS，浏览器会把 http://同域名:8001 升级为 https 导致打不开，可设 WERSS_UI_URL 为 http://公网IP:8001 等。
+app.get('/api/site-meta', (req, res) => {
+  const werssUiUrl = (process.env.WERSS_UI_URL || '').trim() || null;
+  res.json({ ok: true, data: { werssUiUrl } });
+});
+
 // Auth middleware (after public routes)
 app.use(authMiddleware);
 

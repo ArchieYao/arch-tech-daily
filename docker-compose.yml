@@ -15,6 +15,8 @@ services:
       - WERSS_DB_PATH=/app/we-mp-rss/data/db.db
       - WERSS_USERNAME=${WERSS_USERNAME:-admin}
       - WERSS_PASSWORD=${WERSS_PASSWORD:-admin@123}
+      # 浏览器打开 we-mp-rss 的完整地址（须 http）。主站 HSTS 时建议填 http://公网IP:8001，避免被升级为 https
+      - WERSS_UI_URL=${WERSS_UI_URL:-}
     volumes:
       - ai-daily-data:/app/data
       - ./we-mp-rss/data:/app/we-mp-rss/data:ro

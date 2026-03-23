@@ -567,11 +567,22 @@ document.getElementById('changePwdBtn')?.addEventListener('click', async () => {
   }
 });
 
-// 公众号管理 - 打开 we-mp-rss
-// we-mp-rss 容器内为明文 HTTP，无 TLS；主站为 https 时若用 location.protocol 会打开 https://host:8001 导致证书/协议错误。
-// 公网是否可达 8001 取决于 docker ports（是否 0.0.0.0）与安全组，或由 Nginx 反代到子路径/子域名。
-document.getElementById('openWerssBtn')?.addEventListener('click', () => {
-  const werssUrl = `http://${window.location.hostname}:8001`;
+// 公众号管理 - 打开 we-mp-rss（仅 HTTP）。服务端可通过 WERSS_UI_URL 覆盖（见 /api/site-meta），用于主站 HSTS 时避免浏览器把 http://域名:8001 强制升级为 https。
+let cachedWerssUiUrl;
+async function resolveWerssUiUrl() {
+  if (cachedWerssUiUrl !== undefined) return cachedWerssUiUrl;
+  try {
+    const res = await fetch('/api/site-meta');
+    const json = await res.json();
+    const custom = json.ok && json.data?.werssUiUrl && String(json.data.werssUiUrl).trim();
+    cachedWerssUiUrl = custom || `http://${window.location.hostname}:8001`;
+  } catch {
+    cachedWerssUiUrl = `http://${window.location.hostname}:8001`;
+  }
+  return cachedWerssUiUrl;
+}
+document.getElementById('openWerssBtn')?.addEventListener('click', async () => {
+  const werssUrl = await resolveWerssUiUrl();
   window.open(werssUrl, '_blank', 'noopener');
 });
 
