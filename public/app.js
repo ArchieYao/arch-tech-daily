@@ -567,23 +567,9 @@ document.getElementById('changePwdBtn')?.addEventListener('click', async () => {
   }
 });
 
-// 公众号管理 - 打开 we-mp-rss（仅 HTTP）。服务端可通过 WERSS_UI_URL 覆盖（见 /api/site-meta），用于主站 HSTS 时避免浏览器把 http://域名:8001 强制升级为 https。
-let cachedWerssUiUrl;
-async function resolveWerssUiUrl() {
-  if (cachedWerssUiUrl !== undefined) return cachedWerssUiUrl;
-  try {
-    const res = await fetch('/api/site-meta');
-    const json = await res.json();
-    const custom = json.ok && json.data?.werssUiUrl && String(json.data.werssUiUrl).trim();
-    cachedWerssUiUrl = custom || `http://${window.location.hostname}:8001`;
-  } catch {
-    cachedWerssUiUrl = `http://${window.location.hostname}:8001`;
-  }
-  return cachedWerssUiUrl;
-}
-document.getElementById('openWerssBtn')?.addEventListener('click', async () => {
-  const werssUrl = await resolveWerssUiUrl();
-  window.open(werssUrl, '_blank', 'noopener');
+// 公众号管理 - 打开 we-mp-rss：走同域 GET /api/werss/open-ui，由服务端 302 到 WERSS_UI_URL（推荐 http://公网IP:8001），避免 HSTS 把 http://域名:8001 升级为 https。
+document.getElementById('openWerssBtn')?.addEventListener('click', () => {
+  window.open('/api/werss/open-ui', '_blank', 'noopener');
 });
 
 // 公众号管理 - 一键刷新所有公众号

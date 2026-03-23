@@ -80,10 +80,29 @@ app.get('/api/share/:token', (req, res) => {
   res.json({ ok: true, data: publicData });
 });
 
-// 前端「打开公众号管理后台」用：we-mp-rss 仅 HTTP。主站若开 HSTS，浏览器会把 http://同域名:8001 升级为 https 导致打不开，可设 WERSS_UI_URL 为 http://公网IP:8001 等。
+// 前端「打开公众号管理后台」用：we-mp-rss 仅 HTTP。主站若开 HSTS，浏览器会把「直接打开的」http://同域名:8001 升级为 https。
+// 因此按钮改为打开本接口（HTTPS 同域），由服务端 302 到 WERSS_UI_URL（务必为 http://公网IP:8001）；HSTS 不作用于 IP，重定向后可正常访问。
 app.get('/api/site-meta', (req, res) => {
   const werssUiUrl = (process.env.WERSS_UI_URL || '').trim() || null;
   res.json({ ok: true, data: { werssUiUrl } });
+});
+
+app.get('/api/werss/open-ui', (req, res) => {
+  const custom = (process.env.WERSS_UI_URL || '').trim();
+  if (custom) {
+    try {
+      const u = new URL(custom);
+      if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+        return res.status(400).type('text/plain').send('WERSS_UI_URL must be http(s) URL');
+      }
+    } catch {
+      return res.status(500).type('text/plain').send('Invalid WERSS_UI_URL');
+    }
+    return res.redirect(302, custom);
+  }
+  const host = req.get('x-forwarded-host') || req.get('host') || '';
+  const hostname = (host.split(':')[0] || req.hostname || 'localhost').trim() || 'localhost';
+  res.redirect(302, `http://${hostname}:8001`);
 });
 
 // Auth middleware (after public routes)
