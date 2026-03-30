@@ -479,22 +479,28 @@ function setupSchedules(config) {
   console.log(`[schedule] Setting up ${activeSchedules.length} schedule(s)`);
 
   // Single timer checks all schedules every minute
-  let lastTriggeredKey = '';
+  // 使用日期级去重 + 3 分钟窗口，避免 setInterval 漂移跳过精确分钟
+  let lastTriggeredDate = '';
   const timer = setInterval(() => {
     const now = new Date();
     const h = now.getHours(), m = now.getMinutes();
-    const triggerKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}_${h * 60 + m}`;
+    const todayKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
 
-    // Prevent duplicate triggers within the same minute (includes date to allow next-day runs)
-    if (triggerKey === lastTriggeredKey) return;
+    // 每天只触发一次
+    if (todayKey === lastTriggeredDate) return;
 
     for (const sched of activeSchedules) {
-      if (h === (sched.hour ?? 8) && m === (sched.minute ?? 0)) {
+      const schedH = sched.hour ?? 8;
+      const schedM = sched.minute ?? 0;
+      const schedMinOfDay = schedH * 60 + schedM;
+      const curMinOfDay = h * 60 + m;
+      // 3 分钟窗口：scheduled_time <= now < scheduled_time + 3
+      if (curMinOfDay >= schedMinOfDay && curMinOfDay < schedMinOfDay + 3) {
         if (generationState.running) {
           console.log('[schedule] Skipped: generation already running');
           break;
         }
-        lastTriggeredKey = triggerKey;
+        lastTriggeredDate = todayKey;
         const cfg = loadApiConfig();
         if (!cfg?.apiKey) continue;
 
@@ -525,12 +531,13 @@ const savedConfig = loadApiConfigOrInit();
 if (savedConfig) setupSchedules(savedConfig);
 
 // ── 每日凌晨 0:00 自动刷新所有公众号文章 ─────────────────────────
+// 使用 5 分钟窗口（00:00~00:04）而非精确匹配 m===0，避免 setInterval 漂移导致跳过
 let lastMpsRefreshDate = '';
 const mpsRefreshTimer = setInterval(async () => {
   const now = new Date();
   const h = now.getHours(), m = now.getMinutes();
   const todayKey = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
-  if (h === 0 && m === 0 && lastMpsRefreshDate !== todayKey) {
+  if (h === 0 && m < 5 && lastMpsRefreshDate !== todayKey) {
     lastMpsRefreshDate = todayKey;
     console.log(`[mps-refresh] 开始每日凌晨自动刷新所有公众号 (${now.toISOString()})`);
     try {
