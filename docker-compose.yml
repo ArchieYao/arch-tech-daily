@@ -3,6 +3,9 @@ services:
     build: .
     container_name: ai-daily-web
     restart: unless-stopped
+    # 容器内存硬限制：防止单容器耗尽服务器内存（2GB 服务器分配 768MB）
+    mem_limit: 768m
+    memswap_limit: 768m
     ports:
       - "127.0.0.1:3456:3456"
     environment:
@@ -27,6 +30,9 @@ services:
     image: ghcr.io/rachelos/we-mp-rss:latest
     container_name: we-mp-rss
     restart: unless-stopped
+    # 容器内存硬限制：防止 we-mp-rss 内存膨胀（2GB 服务器分配 512MB）
+    mem_limit: 512m
+    memswap_limit: 512m
     # 8001 需从浏览器访问公众号管理后台时，映射到 0.0.0.0（写作 "8001:8001"）并在云安全组放行 TCP 8001。
     # 若仅本机/Nginx 反代访问，可改回 "127.0.0.1:8001:8001"。
     ports:
@@ -36,8 +42,9 @@ services:
       - MAX_PAGE=2
       # 启用 we-mp-rss 内置定时任务（自动抓取订阅号新文章）
       - ENABLE_JOB=True
-      # 定时任务执行间隔（秒），例如 600=10 分钟；保持默认 10 也可以
-      - SPAN_INTERVAL=600
+      # 定时任务执行间隔（秒）：从 600(10分钟) 改为 3600(1小时)，降低内存压力
+      # ai-daily 凌晨 00:00 会触发一次全量刷新，日常 1 小时一次足够
+      - SPAN_INTERVAL=3600
     volumes:
       - ./we-mp-rss/data:/app/data
 

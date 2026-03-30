@@ -567,9 +567,9 @@ setInterval(() => {
   const heap = (mem.heapUsed / 1024 / 1024).toFixed(1);
   const heapTotal = (mem.heapTotal / 1024 / 1024).toFixed(1);
   console.log(`[memory] RSS: ${rss}MB | Heap: ${heap}/${heapTotal}MB | SSE clients: ${sseClients.size} | Rate limit entries: ${rateLimitMap.size}`);
-  // 当内存超过 1.2GB 时主动触发 GC（需配合 --expose-gc 启动参数）
-  if (mem.rss > 1.2 * 1024 * 1024 * 1024 && typeof global.gc === 'function') {
-    console.warn('[memory] RSS > 1.2GB, forcing garbage collection...');
+  // 当内存超过 600MB 时主动触发 GC（容器限制 768MB，提前回收留出安全余量）
+  if (mem.rss > 600 * 1024 * 1024 && typeof global.gc === 'function') {
+    console.warn('[memory] RSS > 600MB, forcing garbage collection...');
     global.gc();
   }
 }, 600_000);
