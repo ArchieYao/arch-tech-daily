@@ -3,9 +3,9 @@ services:
     build: .
     container_name: ai-daily-web
     restart: unless-stopped
-    # 容器内存硬限制：防止单容器耗尽服务器内存（2GB 服务器分配 768MB）
-    mem_limit: 768m
-    memswap_limit: 768m
+    # 容器内存硬限制：防止单容器耗尽服务器内存（2GB 服务器分配 640MB）
+    mem_limit: 640m
+    memswap_limit: 640m
     ports:
       - "127.0.0.1:3456:3456"
     environment:
@@ -30,9 +30,9 @@ services:
     image: ghcr.io/rachelos/we-mp-rss:latest
     container_name: we-mp-rss
     restart: unless-stopped
-    # 容器内存硬限制：防止 we-mp-rss 内存膨胀（2GB 服务器分配 512MB）
-    mem_limit: 512m
-    memswap_limit: 512m
+    # 容器内存硬限制：防止 we-mp-rss 内存膨胀（2GB 服务器分配 640MB，Playwright 需要较多内存）
+    mem_limit: 640m
+    memswap_limit: 640m
     # 8001 需从浏览器访问公众号管理后台时，映射到 0.0.0.0（写作 "8001:8001"）并在云安全组放行 TCP 8001。
     # 若仅本机/Nginx 反代访问，可改回 "127.0.0.1:8001:8001"。
     ports:
