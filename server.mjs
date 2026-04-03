@@ -12,6 +12,7 @@ import { authMiddleware, initDefaultAdmin, verifyUser, verifySession, getSession
 import { saveApiConfig, loadApiConfig, loadApiConfigOrInit, API_PRESETS } from './lib/config.mjs';
 import { translateArticle, translateArticleStream, batchTranslateArticles } from './lib/translate.mjs';
 import { WeRSSClient } from './lib/werss-client.mjs';
+import { sendFeishuAlert } from './lib/notify.mjs';
 import { readFileSync, existsSync } from 'fs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -560,6 +561,29 @@ setImmediate(() => {
   if (pruned > 0) console.log(`[translate] Pruned ${pruned} expired translations`);
 });
 
+// ── 微信登录态巡检：每 6 小时检查一次，提前发现掉线 ──────────────
+let lastWxCheckHour = -1;
+setInterval(async () => {
+  const h = new Date().getHours();
+  if (h % 6 !== 0 || h === lastWxCheckHour) return;
+  lastWxCheckHour = h;
+  try {
+    const token = await getWeRSSToken();
+    const client = getWeRSSClient();
+    const status = await client.getQrStatus(token);
+    const ok = status.login_status === true;
+    if (ok) {
+      console.log(`[wx-check] 微信登录态正常 ✓`);
+    } else {
+      console.warn(`[wx-check] ⚠ 微信登录已过期！请尽快到 we-mp-rss 后台重新扫码，否则下次日报将为空`);
+      sendFeishuAlert('微信登录已过期', '公众号 RSS 数据将停止更新，请尽快到 we-mp-rss 后台重新扫码登录');
+    }
+  } catch (e) {
+    console.warn(`[wx-check] 微信登录态检查失败: ${e.message}`);
+  }
+}, 60_000);
+console.log('[wx-check] 已启用微信登录态巡检 (每 6 小时)');
+
 // ── 内存监控：每 10 分钟打印内存使用情况 ──────────────────────────
 setInterval(() => {
   const mem = process.memoryUsage();
@@ -941,12 +965,27 @@ async function runDigestGeneration(apiKey, apiOpts, hours, topN) {
     const sources = customSources && customSources.length > 0 ? customSources : getDefaultFeeds();
 
     console.log(`[digest] 开始生成日报 (${sources.length} 源, ${hours}h, top${topN})`);
+    let wxLoggedIn = false;
+    try {
+      const chkToken = await getWeRSSToken();
+      const chkClient = getWeRSSClient();
+      const chkStatus = await chkClient.getQrStatus(chkToken);
+      wxLoggedIn = chkStatus.login_status === true;
+      if (!wxLoggedIn) console.warn(`[digest] ⚠ 微信未登录，公众号 RSS 可能无新文章`);
+    } catch {}
+
     saveDigest(dateStr, { hours, status: 'generating', totalFeeds: sources.length });
     const { articles: allArticles, successCount } = await fetchAllFeeds(sources, (done, total, ok, fail) => {
       updateGenerationState({ progress: `抓取进度: ${done}/${total} 源 (${ok} 成功, ${fail} 失败)` });
     });
     console.log(`[feeds] 共抓取 ${allArticles.length} 篇文章 (${successCount} 源成功)`);
-    if (allArticles.length === 0) throw new Error('没有抓取到任何文章');
+    if (allArticles.length === 0) {
+      if (!wxLoggedIn) {
+        console.error(`[digest] 0 篇文章且微信未登录 → 请重新扫码登录 we-mp-rss`);
+        throw new Error('没有抓取到任何文章。微信公众号登录已过期，请重新扫码登录 we-mp-rss 后台');
+      }
+      throw new Error('没有抓取到任何文章');
+    }
 
     // Deduplicate by link URL
     const seen = new Set();
@@ -962,7 +1001,10 @@ async function runDigestGeneration(apiKey, apiOpts, hours, topN) {
     updateGenerationState({ step: 'filtering', progress: '按时间过滤...' });
     const cutoff = new Date(Date.now() - hours * 3600000);
     const recent = dedupedArticles.filter(a => a.pubDate.getTime() > cutoff.getTime());
-    if (recent.length === 0) throw new Error(`最近 ${hours} 小时内没有找到文章`);
+    if (recent.length === 0) {
+      const wxHint = wxLoggedIn ? '' : '（微信公众号登录已过期，请重新扫码）';
+      throw new Error(`最近 ${hours} 小时内没有找到文章${wxHint}`);
+    }
 
     console.log(`[scoring] AI 评分中 (${recent.length} 篇)...`);
     updateGenerationState({ step: 'scoring', progress: `AI 评分中 (${recent.length} 篇)...` });
@@ -1065,6 +1107,7 @@ async function runDigestGeneration(apiKey, apiOpts, hours, topN) {
   } catch (err) {
     updateGenerationState({ running: false, step: 'error', progress: err.message, startedAt: null });
     try { setDigestStatus(dateStr, 'error'); } catch (_) {}
+    sendFeishuAlert('日报生成失败', `错误信息: ${err.message}`);
     throw err;
   }
 }

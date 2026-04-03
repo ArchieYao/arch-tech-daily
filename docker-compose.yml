@@ -20,6 +20,7 @@ services:
       - WERSS_PASSWORD=${WERSS_PASSWORD:-admin@123}
       # 302 目标：/api/werss/open-ui。主站 HSTS 时必须 http://公网IP:8001（不要用同域名）
       - WERSS_UI_URL=${WERSS_UI_URL:-}
+      - FEISHU_WEBHOOK_URL=${FEISHU_WEBHOOK_URL:-}
     volumes:
       - ai-daily-data:/app/data
       - ./we-mp-rss/data:/app/we-mp-rss/data:ro
