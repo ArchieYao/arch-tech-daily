@@ -31,6 +31,8 @@ services:
     image: ghcr.io/rachelos/we-mp-rss:latest
     container_name: we-mp-rss
     restart: unless-stopped
+    labels:
+      - autoheal=true
     # 容器内存硬限制：防止 we-mp-rss 内存膨胀（2GB 服务器分配 640MB，Playwright 需要较多内存）
     mem_limit: 640m
     memswap_limit: 640m
@@ -43,11 +45,28 @@ services:
       - MAX_PAGE=2
       # 启用 we-mp-rss 内置定时任务（自动抓取订阅号新文章）
       - ENABLE_JOB=True
-      # 定时任务执行间隔（秒）：从 600(10分钟) 改为 3600(1小时)，降低内存压力
-      # ai-daily 凌晨 00:00 会触发一次全量刷新，日常 1 小时一次足够
-      - SPAN_INTERVAL=3600
+      # 定时任务执行间隔（秒）：使用 7200(2小时)，进一步降低内存和浏览器拉起频率
+      # ai-daily 凌晨 00:00 会触发一次全量刷新，日常 2 小时一次足够
+      - SPAN_INTERVAL=7200
     volumes:
       - ./we-mp-rss/data:/app/data
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/', timeout=4)\""]
+      interval: 30s
+      timeout: 8s
+      retries: 3
+      start_period: 40s
+
+  autoheal:
+    image: willfarrell/autoheal:latest
+    container_name: autoheal
+    restart: unless-stopped
+    environment:
+      - AUTOHEAL_CONTAINER_LABEL=autoheal
+      - AUTOHEAL_INTERVAL=15
+      - AUTOHEAL_START_PERIOD=60
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
 
 volumes:
   ai-daily-data:
