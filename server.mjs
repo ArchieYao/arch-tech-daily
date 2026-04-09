@@ -267,18 +267,38 @@ async function getWeRSSToken() {
   return accessToken;
 }
 
-app.get('/api/werss/status', asyncHandler(async (req, res) => {
+function isWeRSSAuthError(err) {
+  const msg = String(err?.message || '').toLowerCase();
+  return msg.includes('could not validate credentials')
+    || msg.includes('unauthorized')
+    || msg.includes('token')
+    || msg.includes('401');
+}
+
+async function withWeRSSAuth(run) {
   const client = getWeRSSClient();
+  try {
+    const token = await getWeRSSToken();
+    return await run(client, token);
+  } catch (e) {
+    if (!isWeRSSAuthError(e)) throw e;
+    // we-mp-rss 重启后旧 token 常失效；清缓存并重登后重试一次。
+    werssJwtCache = { token: null, expiresAt: 0 };
+    const token = await getWeRSSToken();
+    return await run(client, token);
+  }
+}
+
+app.get('/api/werss/status', asyncHandler(async (req, res) => {
   let connected = false;
   let wxLoggedIn = false;
   let error = null;
   try {
-    const token = await getWeRSSToken();
-    connected = true;
-    try {
-      const status = await client.getQrStatus(token);
-      wxLoggedIn = status.login_status === true;
-    } catch {}
+    const status = await withWeRSSAuth(async (client, token) => {
+      connected = true;
+      return await client.getQrStatus(token);
+    });
+    wxLoggedIn = status?.login_status === true;
   } catch (e) {
     error = e.message;
   }
@@ -287,7 +307,7 @@ app.get('/api/werss/status', asyncHandler(async (req, res) => {
 
 app.post('/api/werss/login', asyncHandler(async (req, res) => {
   try {
-    await getWeRSSToken();
+    await withWeRSSAuth(async () => true);
     res.json({ ok: true, message: '已登录 we-mp-rss' });
   } catch (e) {
     res.json({ ok: false, error: e.message });
@@ -298,9 +318,7 @@ let werssLastQrPath = '';
 
 app.get('/api/werss/qr/code', asyncHandler(async (req, res) => {
   try {
-    const token = await getWeRSSToken();
-    const client = getWeRSSClient();
-    const data = await client.getQrCode(token);
+    const data = await withWeRSSAuth(async (client, token) => await client.getQrCode(token));
     const codePath = (typeof data === 'string' ? data : data?.code || data?.url) || '';
     werssLastQrPath = codePath;
     res.json({ ok: true, data: { code: codePath } });
@@ -352,9 +370,7 @@ app.get('/api/werss/qr/image', asyncHandler(async (req, res) => {
 
 app.get('/api/werss/qr/status', asyncHandler(async (req, res) => {
   try {
-    const token = await getWeRSSToken();
-    const client = getWeRSSClient();
-    const status = await client.getQrStatus(token);
+    const status = await withWeRSSAuth(async (client, token) => await client.getQrStatus(token));
     res.json({ ok: true, data: status });
   } catch (e) {
     res.json({ ok: false, error: e.message });
@@ -366,9 +382,7 @@ app.get('/api/werss/search', asyncHandler(async (req, res) => {
     const kw = req.query.kw || '';
     const limit = Math.min(parseInt(req.query.limit, 10) || 10, 20);
     const offset = parseInt(req.query.offset, 10) || 0;
-    const token = await getWeRSSToken();
-    const client = getWeRSSClient();
-    const data = await client.searchMp(token, kw, limit, offset);
+    const data = await withWeRSSAuth(async (client, token) => await client.searchMp(token, kw, limit, offset));
     res.json({ ok: true, data });
   } catch (e) {
     res.json({ ok: false, error: e.message });
@@ -379,9 +393,8 @@ app.post('/api/werss/subscribe', asyncHandler(async (req, res) => {
   try {
     const { fakeid, nickname, mp_cover, mp_intro } = req.body || {};
     if (!fakeid) return res.status(400).json({ ok: false, error: 'missing_fakeid' });
-    const token = await getWeRSSToken();
     const client = getWeRSSClient();
-    const result = await client.subscribeMp(token, { fakeid, nickname, mp_cover, mp_intro });
+    const result = await withWeRSSAuth(async (_client, token) => await client.subscribeMp(token, { fakeid, nickname, mp_cover, mp_intro }));
     const feedId = result.id || fakeid;
     const rssUrl = client.getRssUrl(feedId);
     res.json({ ok: true, data: { feedId, rssUrl, name: nickname || feedId } });
@@ -395,9 +408,8 @@ app.get('/api/werss/mps', asyncHandler(async (req, res) => {
     const limit = Math.min(parseInt(req.query.limit, 10) || 50, 100);
     const offset = parseInt(req.query.offset, 10) || 0;
     const kw = (req.query.kw || '').trim();
-    const token = await getWeRSSToken();
     const client = getWeRSSClient();
-    const data = await client.getMpList(token, limit, offset, kw);
+    const data = await withWeRSSAuth(async (_client, token) => await client.getMpList(token, limit, offset, kw));
     if (data && Array.isArray(data.list)) {
       data.list = data.list.map(mp => ({ ...mp, rssUrl: client.getRssUrl(mp.id) }));
     }
@@ -449,9 +461,7 @@ app.get('/api/werss/export', asyncHandler(async (req, res) => {
 // 手动刷新所有公众号最新文章（通过 WeRSSClient 逐个触发更新）
 async function handleWeRssRefresh(req, res) {
   try {
-    const token = await getWeRSSToken();
-    const client = getWeRSSClient();
-    const result = await client.refreshAllMps(token);
+    const result = await withWeRSSAuth(async (client, token) => await client.refreshAllMps(token));
     console.log(`[werss/refresh] 刷新完成: ${result.updated}/${result.total} 个公众号`);
     res.json({ ok: true, data: result });
   } catch (e) {
@@ -566,9 +576,7 @@ const mpsRefreshTimer = setInterval(async () => {
     lastMpsRefreshDate = todayKey;
     console.log(`[mps-refresh] 开始每日凌晨自动刷新所有公众号 (${now.toISOString()})`);
     try {
-      const token = await getWeRSSToken();
-      const client = getWeRSSClient();
-      const result = await client.refreshAllMps(token);
+      const result = await withWeRSSAuth(async (client, token) => await client.refreshAllMps(token));
       console.log(`[mps-refresh] 刷新完成: ${result.updated}/${result.total} 个公众号`);
     } catch (e) {
       console.error(`[mps-refresh] 刷新失败: ${e.message}`);
@@ -592,9 +600,7 @@ setInterval(async () => {
   if (h % 6 !== 0 || h === lastWxCheckHour) return;
   lastWxCheckHour = h;
   try {
-    const token = await getWeRSSToken();
-    const client = getWeRSSClient();
-    const status = await client.getQrStatus(token);
+    const status = await withWeRSSAuth(async (client, token) => await client.getQrStatus(token));
     const ok = status.login_status === true;
     if (ok) {
       console.log(`[wx-check] 微信登录态正常 ✓`);
@@ -991,9 +997,7 @@ async function runDigestGeneration(apiKey, apiOpts, hours, topN) {
     console.log(`[digest] 开始生成日报 (${sources.length} 源, ${hours}h, top${topN})`);
     let wxLoggedIn = false;
     try {
-      const chkToken = await getWeRSSToken();
-      const chkClient = getWeRSSClient();
-      const chkStatus = await chkClient.getQrStatus(chkToken);
+      const chkStatus = await withWeRSSAuth(async (client, token) => await client.getQrStatus(token));
       wxLoggedIn = chkStatus.login_status === true;
       if (!wxLoggedIn) console.warn(`[digest] ⚠ 微信未登录，公众号 RSS 可能无新文章`);
     } catch {}

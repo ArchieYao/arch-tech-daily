@@ -33,9 +33,9 @@ services:
     restart: unless-stopped
     labels:
       - autoheal=true
-    # 容器内存硬限制：防止 we-mp-rss 内存膨胀（2GB 服务器分配 640MB，Playwright 需要较多内存）
-    mem_limit: 640m
-    memswap_limit: 640m
+    # 容器内存硬限制：Playwright 进程较重，提升到 1024m 降低 EPIPE/崩溃概率
+    mem_limit: 1024m
+    memswap_limit: 1024m
     # 8001 需从浏览器访问公众号管理后台时，映射到 0.0.0.0（写作 "8001:8001"）并在云安全组放行 TCP 8001。
     # 若仅本机/Nginx 反代访问，可改回 "127.0.0.1:8001:8001"。
     ports:
@@ -43,6 +43,8 @@ services:
     environment:
       # 限制历史抓取页数，降低被风控风险（默认 5，这里改为 2）
       - MAX_PAGE=2
+      # Chromium 在服务器环境通常比 WebKit 更稳定，减少二维码登录线程崩溃概率
+      - BROWSER_TYPE=chromium
       # 启用 we-mp-rss 内置定时任务（自动抓取订阅号新文章）
       - ENABLE_JOB=True
       # 定时任务执行间隔（秒）：与内置 cron 配合；过小易与 Playwright 抢资源，过大则更新慢
