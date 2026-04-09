@@ -466,6 +466,30 @@ app.get('/api/werss/refresh', asyncHandler(handleWeRssRefresh));
 // --- Per-channel scheduling ---
 let scheduleTimers = [];
 
+/** 上海时区当前时分与日历日（不依赖进程 TZ，避免容器内仍为 UTC 时误判「凌晨」） */
+function getShanghaiClock(d = new Date()) {
+  const f = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Shanghai',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  const parts = {};
+  for (const p of f.formatToParts(d)) {
+    if (p.type !== 'literal') parts[p.type] = p.value;
+  }
+  return {
+    year: Number(parts.year),
+    month: Number(parts.month),
+    day: Number(parts.day),
+    hour: Number(parts.hour),
+    minute: Number(parts.minute),
+  };
+}
+
 function setupSchedules(config) {
   // Clear all existing timers
   scheduleTimers.forEach(t => clearInterval(t));
@@ -484,8 +508,8 @@ function setupSchedules(config) {
   let lastTriggeredDate = '';
   const timer = setInterval(() => {
     const now = new Date();
-    const h = now.getHours(), m = now.getMinutes();
-    const todayKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
+    const { year, month, day, hour: h, minute: m } = getShanghaiClock(now);
+    const todayKey = `${year}-${month}-${day}`;
 
     // 每天只触发一次
     if (todayKey === lastTriggeredDate) return;
@@ -536,8 +560,8 @@ if (savedConfig) setupSchedules(savedConfig);
 let lastMpsRefreshDate = '';
 const mpsRefreshTimer = setInterval(async () => {
   const now = new Date();
-  const h = now.getHours(), m = now.getMinutes();
-  const todayKey = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
+  const { year, month, day, hour: h, minute: m } = getShanghaiClock(now);
+  const todayKey = `${year}-${month}-${day}`;
   if (h === 0 && m < 5 && lastMpsRefreshDate !== todayKey) {
     lastMpsRefreshDate = todayKey;
     console.log(`[mps-refresh] 开始每日凌晨自动刷新所有公众号 (${now.toISOString()})`);
@@ -564,7 +588,7 @@ setImmediate(() => {
 // ── 微信登录态巡检：每 6 小时检查一次，提前发现掉线 ──────────────
 let lastWxCheckHour = -1;
 setInterval(async () => {
-  const h = new Date().getHours();
+  const h = getShanghaiClock().hour;
   if (h % 6 !== 0 || h === lastWxCheckHour) return;
   lastWxCheckHour = h;
   try {
