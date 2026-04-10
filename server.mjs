@@ -583,7 +583,6 @@ const mpsRefreshTimer = setInterval(async () => {
     }
   }
 }, 60000);
-scheduleTimers.push(mpsRefreshTimer);
 console.log('[mps-refresh] 已启用每日 00:00 自动刷新所有公众号');
 
 // Prune old data on startup (keep 30 days)
