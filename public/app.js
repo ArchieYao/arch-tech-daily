@@ -579,7 +579,8 @@ document.getElementById('refreshAllMpsBtn')?.addEventListener('click', async () 
   btn.disabled = true;
   btn.textContent = '正在刷新...';
   resultEl.classList.remove('hidden');
-  resultEl.innerHTML = '<p>正在获取公众号列表并逐个刷新，请稍候...</p>';
+  resultEl.innerHTML =
+    '<p>正在获取公众号列表并逐个刷新，请稍候…</p><p class="text-sand-500 mt-1">说明：每个公众号会触发 we-mp-rss 后台抓取，公众号较多时可能需<strong>数分钟到十几分钟</strong>；此期间公众号管理后台页面可能暂时打不开，属正常现象。</p>';
   try {
     const res = await apiFetch('/api/werss/refresh', { method: 'POST' });
     const data = await res.json();

@@ -461,6 +461,7 @@ app.get('/api/werss/export', asyncHandler(async (req, res) => {
 // 手动刷新所有公众号最新文章（通过 WeRSSClient 逐个触发更新）
 async function handleWeRssRefresh(req, res) {
   try {
+    console.log('[werss/refresh] 开始一键刷新（可能耗时数分钟，期间 we-mp-rss 网页可能暂时无响应）');
     const result = await withWeRSSAuth(async (client, token) => await client.refreshAllMps(token));
     console.log(`[werss/refresh] 刷新完成: ${result.updated}/${result.total} 个公众号`);
     res.json({ ok: true, data: result });
