@@ -1,0 +1,21 @@
+{
+  "name": "wx-exporter",
+  "version": "0.1.0",
+  "private": true,
+  "description": "本地小工具：从 we-mp-rss 已订阅公众号中按时间范围导出文章为 Word 文档",
+  "type": "module",
+  "scripts": {
+    "start": "node app.mjs",
+    "dev": "node --watch app.mjs"
+  },
+  "dependencies": {
+    "archiver": "^7.0.1",
+    "docx": "^9.6.1",
+    "express": "^4.21.0",
+    "node-html-parser": "^7.1.0",
+    "sql.js": "^1.14.1"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

@@ -60,3 +60,13 @@ out/
 tmp/
 temp/
 *.tmp
+
+# wx-exporter 子项目的隐私数据（双重保险，子目录有自己的 .gitignore）
+# 这里明确排除其运行时数据，确保主项目层面绝不会意外上传：
+#   - we-mp-rss SQLite + 微信扫码登录态
+#   - 抓取下来的公众号正文 / 图片 / docx / zip
+#   - 子项目 .env（含 we-mp-rss 后台密码）
+wx-exporter/data/
+wx-exporter/node_modules/
+wx-exporter/.env
+wx-exporter/*.log

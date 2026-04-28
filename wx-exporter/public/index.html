@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>WX Exporter · 公众号文章导 Word 工具</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">📦</span>
+      <div>
+        <div class="title">WX Exporter</div>
+        <div class="subtitle">公众号文章 → Word 文档（本地工具）</div>
+      </div>
+    </div>
+    <div id="health-bar" class="health">检测中…</div>
+  </header>
+
+  <main>
+    <div class="tab-bar">
+      <button class="tab active" data-tab="byUrls">按文章链接</button>
+      <button class="tab" data-tab="byRange">按公众号 + 时间</button>
+    </div>
+
+    <div id="panel-byRange" class="panel" hidden>
+      <section class="card">
+        <h2>1. 选择公众号</h2>
+        <div class="mp-toolbar">
+          <input id="mp-filter" placeholder="按名称搜索…" />
+          <button id="btn-refresh-mps" class="btn ghost">刷新列表</button>
+          <span class="hint" id="mp-count">—</span>
+          <span class="spacer"></span>
+          <button id="btn-select-all" class="btn ghost">全选</button>
+          <button id="btn-select-none" class="btn ghost">清空</button>
+        </div>
+        <div id="mp-list" class="mp-list"></div>
+      </section>
+
+      <section class="card">
+        <h2>2. 选择时间范围</h2>
+        <div class="range-row">
+          <label>开始：<input type="date" id="date-start" /></label>
+          <label>结束：<input type="date" id="date-end" /></label>
+          <span class="spacer"></span>
+          <button class="btn ghost" data-days="1">近 1 天</button>
+          <button class="btn ghost" data-days="7">近 7 天</button>
+          <button class="btn ghost" data-days="30">近 30 天</button>
+          <button class="btn ghost" data-days="90">近 90 天</button>
+        </div>
+      </section>
+    </div>
+
+    <div id="panel-byUrls" class="panel">
+      <section class="card">
+        <h2>1. 批次名称</h2>
+        <div class="range-row">
+          <label style="flex:1">
+            输出 Word 文件名：
+            <input type="text" id="batch-name" placeholder="文章合集_YYYY-MM-DD" />
+          </label>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>2. 粘贴文章链接</h2>
+        <p class="hint">
+          支持 <code>https://mp.weixin.qq.com/s/...</code> 短链 和
+          <code>https://mp.weixin.qq.com/s?__biz=...&amp;mid=...&amp;idx=...&amp;sn=...</code> 长链。
+          支持按换行、逗号、空格一次粘贴多条。
+        </p>
+        <textarea id="urls-input" rows="5" placeholder="在此粘贴一个或多个微信文章链接…"></textarea>
+        <div class="action-row">
+          <button id="btn-add-urls" class="btn">添加到列表</button>
+          <button id="btn-clear-urls" class="btn ghost">清空列表</button>
+          <span class="spacer"></span>
+          <span id="urls-stats" class="hint">当前列表：0 条</span>
+        </div>
+        <div id="urls-warn" class="hint warn" hidden></div>
+        <ul id="urls-list" class="url-list"></ul>
+      </section>
+    </div>
+
+    <section class="card">
+      <h2>3. 预览 / 开始导出</h2>
+      <div class="action-row">
+        <button id="btn-preview" class="btn">预览命中文章</button>
+        <button id="btn-start" class="btn primary">开始导出</button>
+        <span id="action-msg" class="hint"></span>
+      </div>
+      <div id="preview" class="preview"></div>
+    </section>
+
+    <section class="card">
+      <h2>4. 任务进度</h2>
+      <div id="job-list" class="job-list"></div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <div>本工具仅监听 127.0.0.1，所有数据保存在本地 <code>data/</code> 目录</div>
+  </footer>
+
+  <script src="/app.js"></script>
+</body>
+</html>

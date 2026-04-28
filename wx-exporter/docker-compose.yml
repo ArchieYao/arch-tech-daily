@@ -1,0 +1,29 @@
+# 本地独立 we-mp-rss 容器，仅供 wx-exporter 工具使用
+# 与主项目根目录的 docker-compose.yml 物理隔离：
+#   - 容器名 wx-exporter-werss（避免和主项目 we-mp-rss 冲突）
+#   - 宿主端口 8002（避免和主项目 8001 冲突）
+#   - 数据目录 ./data/werss（独立 SQLite 与登录态）
+#
+# 安全说明：
+#   默认仅绑定 127.0.0.1，确保 we-mp-rss（含微信扫码登录态）只能本机访问。
+#   如需让局域网内其他设备使用，可改为 "0.0.0.0:8002:8001"，但请知晓
+#   we-mp-rss 没有强账号体系，扫码登录态等同于你的微信账号，**切勿暴露公网**。
+
+services:
+  wx-exporter-werss:
+    image: ghcr.io/rachelos/we-mp-rss:latest
+    container_name: wx-exporter-werss
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8002:8001"
+    environment:
+      # 历史抓取页数：本地工具一般只关心近期新文章，2 页足够，过大易触发风控
+      - MAX_PAGE=2
+      # 服务器/桌面环境用 chromium 比 webkit 稳定
+      - BROWSER_TYPE=chromium
+      # 启用 we-mp-rss 内置定时任务（订阅后会自动周期拉新）
+      - ENABLE_JOB=True
+      # 内置 cron 间隔（秒）
+      - SPAN_INTERVAL=3600
+    volumes:
+      - ./data/werss:/app/data

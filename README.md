@@ -214,6 +214,23 @@ ai-daily/
 
 ---
 
+## 附属工具：wx-exporter（公众号文章 → Word 本地导出）
+
+仓库根目录下的 [`wx-exporter/`](./wx-exporter) 是一个**完全独立的本地小工具**，与主项目物理隔离：
+
+- **它是什么**：从已订阅的微信公众号中按时间范围或文章链接，把整篇文章（含图片）批量导出为 Word 文档。
+- **它为什么独立放这里**：偶尔本地用一次的小脚本，没必要单开一个仓库；但又不想污染主项目的 Docker 镜像，所以独立成一个子目录。
+- **隔离边界**（这些都已在配置里固化，不需要你做额外操作）：
+  - 主项目 `Dockerfile` 只 `COPY` 自己的 `lib/`、`public/`、`server.mjs`，**不会** `COPY wx-exporter/`
+  - `.dockerignore` 显式排除了 `wx-exporter/`，进一步防止误打包到云端镜像
+  - 主项目 `.gitignore` 显式排除了 `wx-exporter/data/`、`wx-exporter/node_modules/`、`wx-exporter/.env`，**任何隐私数据（微信扫码登录态、SQLite、抓取的文章）都不会进 Git**
+  - 子项目用独立的 `docker-compose.yml`、独立的容器名 `wx-exporter-werss`、独立的端口 `127.0.0.1:8002`，与主项目的 `we-mp-rss` 容器互不影响
+  - 不要把它部署到云端：详见 [`wx-exporter/README.md`](./wx-exporter/README.md) 顶部的「安全与隐私说明」
+
+如果你不需要批量导出公众号文章为 Word，**完全可以无视这个目录**，主项目的功能与它无关。
+
+---
+
 ## 致谢
 
 - 微信公众号 RSS：[we-mp-rss](https://github.com/rachelos/we-mp-rss)

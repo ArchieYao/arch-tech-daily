@@ -6,3 +6,7 @@ npm-debug.log
 README.md
 data/*.json
 *.md
+
+# 关键：主项目的 Docker 镜像绝不能带上 wx-exporter
+# 它是本地小工具，含微信扫码登录态/抓取数据，不应进任何云端镜像
+wx-exporter/
