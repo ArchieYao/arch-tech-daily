@@ -169,6 +169,52 @@ window.addEventListener('hashchange', route);
 
 // --- Admin page ---
 let adminRssSources = [];
+let adminHasSavedApiKey = false;
+let adminSavedApiKeyMasked = '';
+let settingsHasSavedApiKey = false;
+let settingsSavedApiKeyMasked = '';
+
+function updateApiKeyStatus(statusElId, inputId, hasSaved, masked) {
+  const statusEl = document.getElementById(statusElId);
+  const input = document.getElementById(inputId);
+  if (!statusEl || !input) return;
+  if (hasSaved && masked) {
+    statusEl.textContent = `✅ 已保存 API Key（${masked}），留空则沿用当前 Key`;
+    statusEl.className = 'text-[10px] mt-1.5 text-green-600 dark:text-green-400';
+    statusEl.classList.remove('hidden');
+    input.placeholder = '留空则保持已保存的 Key';
+  } else {
+    statusEl.textContent = '';
+    statusEl.classList.add('hidden');
+    input.placeholder = '输入 API Key';
+  }
+}
+
+function applyLoadedApiConfig(c, { presetBtnsSelector, baseURLId, modelId, onPreset }) {
+  if (!c) return;
+  const preset = c.preset || 'doubao';
+  if (onPreset) onPreset(preset);
+  else if (presetBtnsSelector) {
+    document.querySelectorAll(presetBtnsSelector).forEach(b => b.classList.toggle('active', b.dataset.preset === preset));
+  }
+  if (c.baseURL) document.getElementById(baseURLId).value = c.baseURL;
+  if (c.model) document.getElementById(modelId).value = c.model;
+}
+
+async function saveApiConfigRequest(payload) {
+  const res = await apiFetch('/api/config', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.ok) {
+    const err = new Error(data.message || data.error || '保存失败');
+    err.data = data;
+    throw err;
+  }
+  return data;
+}
 
 function initAdminTabs() {
   const allTabs = ['adminApiTab', 'adminScheduleTab', 'adminRssTab', 'adminWxmpTab', 'adminPasswordTab'];
@@ -188,15 +234,23 @@ async function loadAdminConfig() {
   try {
     const res = await apiFetch('/api/config');
     const data = await res.json();
+    if (!res.ok) throw new Error(data.message || '加载配置失败');
     if (data.ok && data.data) {
       const c = data.data;
-      const preset = c.preset || 'doubao';
-      document.querySelectorAll('#adminPresetBtns .preset-btn').forEach(b => b.classList.toggle('active', b.dataset.preset === preset));
-      const hintEl = document.getElementById('adminPresetHint');
-      if (hintEl) hintEl.textContent = PRESET_HINTS[preset] || '';
-      if (c.apiKeyMasked) document.getElementById('adminCfgApiKey').placeholder = c.apiKeyMasked;
-      document.getElementById('adminCfgBaseURL').value = c.baseURL || '';
-      document.getElementById('adminCfgModel').value = c.model || '';
+      adminHasSavedApiKey = !!c.hasApiKey || !!c.apiKeyMasked;
+      adminSavedApiKeyMasked = c.apiKeyMasked || '';
+      applyLoadedApiConfig(c, {
+        presetBtnsSelector: '#adminPresetBtns .preset-btn',
+        baseURLId: 'adminCfgBaseURL',
+        modelId: 'adminCfgModel',
+        onPreset: (preset) => {
+          document.querySelectorAll('#adminPresetBtns .preset-btn').forEach(b => b.classList.toggle('active', b.dataset.preset === preset));
+          const hintEl = document.getElementById('adminPresetHint');
+          if (hintEl) hintEl.textContent = PRESET_HINTS[preset] || '';
+        },
+      });
+      document.getElementById('adminCfgApiKey').value = '';
+      updateApiKeyStatus('adminApiKeyStatus', 'adminCfgApiKey', adminHasSavedApiKey, adminSavedApiKeyMasked);
       if (c.schedules?.length) {
         const s = c.schedules[0];
         document.getElementById('adminScheduleEnabled').checked = !!s.enabled;
@@ -204,11 +258,20 @@ async function loadAdminConfig() {
         document.getElementById('adminScheduleHours').value = s.hours ?? 24;
         document.getElementById('adminScheduleTopN').value = s.topN ?? 15;
       }
+    } else {
+      adminHasSavedApiKey = false;
+      adminSavedApiKeyMasked = '';
+      updateApiKeyStatus('adminApiKeyStatus', 'adminCfgApiKey', false, '');
     }
     const rres = await apiFetch('/api/rss-sources');
     const rdata = await rres.json();
     if (rdata.ok) adminRssSources = rdata.data.custom?.length ? rdata.data.custom : (rdata.data.default || []);
-  } catch {}
+  } catch (err) {
+    adminHasSavedApiKey = false;
+    adminSavedApiKeyMasked = '';
+    updateApiKeyStatus('adminApiKeyStatus', 'adminCfgApiKey', false, '');
+    window.showToast?.(err.message || '加载配置失败，请重新登录', 'error');
+  }
 }
 
 async function loadAdminRssList() {
@@ -330,12 +393,12 @@ document.getElementById('adminTestApiBtn')?.addEventListener('click', async () =
   const model = document.getElementById('adminCfgModel').value.trim();
   const preset = document.querySelector('#adminPresetBtns .preset-btn.active')?.dataset?.preset || 'custom';
   const resultEl = document.getElementById('adminTestResult');
-  if (!apiKey) { resultEl.textContent = '请先输入 API Key'; return; }
+  if (!apiKey && !adminHasSavedApiKey) { resultEl.textContent = '请先输入 API Key'; return; }
   resultEl.textContent = '测试中...';
   try {
     const res = await apiFetch('/api/test-connection', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ preset, apiKey, baseURL, model }) });
     const data = await res.json();
-    resultEl.textContent = data.ok ? '✅ 连接成功' : `❌ ${data.error || '失败'}`;
+    resultEl.textContent = data.ok ? '✅ 连接成功' : `❌ ${data.message || data.error || '失败'}`;
   } catch { resultEl.textContent = '❌ 网络错误'; }
 });
 
@@ -348,15 +411,31 @@ document.getElementById('adminSaveBtn')?.addEventListener('click', async () => {
   const hour = parseInt(document.getElementById('adminScheduleHour').value) || 8;
   const hours = parseInt(document.getElementById('adminScheduleHours').value) || 24;
   const topN = parseInt(document.getElementById('adminScheduleTopN').value) || 15;
-  if (!apiKey) { window.showToast?.('请输入 API Key', 'error'); return; }
+  if (!apiKey && !adminHasSavedApiKey) { window.showToast?.('请输入 API Key', 'error'); return; }
   const needsBaseURL = ['custom', 'doubao', 'openai'].includes(preset);
   const needsModel = ['custom', 'doubao', 'openai', 'minimax'].includes(preset);
   const schedules = scheduleEnabled ? [{ enabled: true, preset, hour, minute: 0, hours, topN, baseURL: needsBaseURL ? baseURL : '', model: needsModel ? model : '' }] : [];
   try {
-    await apiFetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ preset, apiKey, baseURL, model, schedules }) });
-    await apiFetch('/api/rss-sources', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sources: adminRssSources }) });
-    window.showToast?.('配置已保存', 'success');
-  } catch { window.showToast?.('保存失败', 'error'); }
+    const data = await saveApiConfigRequest({ preset, apiKey, baseURL, model, schedules });
+    adminHasSavedApiKey = !!data.data?.hasApiKey || !!data.data?.apiKeyMasked;
+    adminSavedApiKeyMasked = data.data?.apiKeyMasked || adminSavedApiKeyMasked;
+    document.getElementById('adminCfgApiKey').value = '';
+    updateApiKeyStatus('adminApiKeyStatus', 'adminCfgApiKey', adminHasSavedApiKey, adminSavedApiKeyMasked);
+
+    try {
+      const rssRes = await apiFetch('/api/rss-sources', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sources: adminRssSources }) });
+      const rssData = await rssRes.json().catch(() => ({}));
+      if (!rssRes.ok || !rssData.ok) {
+        window.showToast?.('API 配置已保存，但 RSS 源保存失败', 'error');
+        return;
+      }
+      window.showToast?.('配置已保存', 'success');
+    } catch {
+      window.showToast?.('API 配置已保存，但 RSS 源保存失败', 'error');
+    }
+  } catch (err) {
+    window.showToast?.(err.message || '保存失败', 'error');
+  }
 });
 
 document.getElementById('adminPresetBtns')?.addEventListener('click', e => {
@@ -885,14 +964,17 @@ document.getElementById('resetRssBtn').addEventListener('click', async () => {
 
 document.getElementById('settingsBtn').addEventListener('click', async () => {
   settingsModal.classList.remove('hidden');
-  // Load saved config
   try {
     const res = await apiFetch('/api/config');
     const data = await res.json();
+    if (!res.ok) throw new Error(data.message || '加载配置失败');
     if (data.ok && data.data) {
       const c = data.data;
+      settingsHasSavedApiKey = !!c.hasApiKey || !!c.apiKeyMasked;
+      settingsSavedApiKeyMasked = c.apiKeyMasked || '';
       selectPreset(c.preset || 'gemini');
-      if (c.apiKeyMasked) document.getElementById('cfgApiKey').placeholder = c.apiKeyMasked;
+      document.getElementById('cfgApiKey').value = '';
+      updateApiKeyStatus('cfgApiKeyStatus', 'cfgApiKey', settingsHasSavedApiKey, settingsSavedApiKeyMasked);
       if (c.baseURL) document.getElementById('cfgBaseURL').value = c.baseURL;
       if (c.model) document.getElementById('cfgModel').value = c.model;
       if (c.schedules?.length) {
@@ -903,8 +985,17 @@ document.getElementById('settingsBtn').addEventListener('click', async () => {
         if (s.hours) document.getElementById('cfgScheduleHours').value = s.hours;
         if (s.topN) document.getElementById('cfgScheduleTopN').value = s.topN;
       }
+    } else {
+      settingsHasSavedApiKey = false;
+      settingsSavedApiKeyMasked = '';
+      updateApiKeyStatus('cfgApiKeyStatus', 'cfgApiKey', false, '');
     }
-  } catch {}
+  } catch (err) {
+    settingsHasSavedApiKey = false;
+    settingsSavedApiKeyMasked = '';
+    updateApiKeyStatus('cfgApiKeyStatus', 'cfgApiKey', false, '');
+    window.showToast?.(err.message || '加载配置失败', 'error');
+  }
 });
 document.getElementById('settingsCancel').addEventListener('click', () => settingsModal.classList.add('hidden'));
 settingsModal.addEventListener('click', e => { if (e.target === settingsModal) settingsModal.classList.add('hidden'); });
@@ -945,7 +1036,7 @@ document.getElementById('testApiBtn').addEventListener('click', async () => {
   const resultEl = document.getElementById('testResult');
   const btn = document.getElementById('testApiBtn');
 
-  if (!apiKey) {
+  if (!apiKey && !settingsHasSavedApiKey) {
     resultEl.textContent = '请先输入 API Key';
     resultEl.className = 'text-[10px] mt-1 text-red-500';
     resultEl.classList.remove('hidden');
@@ -1005,7 +1096,7 @@ document.getElementById('settingsSave').addEventListener('click', async () => {
     model: ['custom', 'doubao', 'openai', 'minimax'].includes(selectedPreset) ? model : '',
   }] : [];
 
-  if (!apiKey) {
+  if (!apiKey && !settingsHasSavedApiKey) {
     const statusEl = document.getElementById('cfgStatus');
     statusEl.textContent = '请输入 API Key';
     statusEl.className = 'text-xs text-center text-red-500';
@@ -1014,23 +1105,28 @@ document.getElementById('settingsSave').addEventListener('click', async () => {
   }
 
   try {
-    const res = await apiFetch('/api/config', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ preset: selectedPreset, apiKey, baseURL, model, schedules }),
+    const data = await saveApiConfigRequest({
+      preset: selectedPreset,
+      apiKey,
+      baseURL,
+      model,
+      schedules,
     });
-    const data = await res.json();
+    settingsHasSavedApiKey = !!data.data?.hasApiKey || !!data.data?.apiKeyMasked;
+    settingsSavedApiKeyMasked = data.data?.apiKeyMasked || settingsSavedApiKeyMasked;
+    document.getElementById('cfgApiKey').value = '';
+    updateApiKeyStatus('cfgApiKeyStatus', 'cfgApiKey', settingsHasSavedApiKey, settingsSavedApiKeyMasked);
     const statusEl = document.getElementById('cfgStatus');
-    if (data.ok) {
-      statusEl.textContent = '✅ 配置已加密保存到服务器';
-      statusEl.className = 'text-xs text-center text-green-600 dark:text-green-400';
-      statusEl.classList.remove('hidden');
-      setTimeout(() => { settingsModal.classList.add('hidden'); statusEl.classList.add('hidden'); }, 1500);
-    } else {
-      statusEl.textContent = data.message || '保存失败';
-      statusEl.className = 'text-xs text-center text-red-500';
-      statusEl.classList.remove('hidden');
-    }
-  } catch { window.showToast?.('网络错误', 'error'); }
+    statusEl.textContent = '✅ 配置已加密保存到服务器';
+    statusEl.className = 'text-xs text-center text-green-600 dark:text-green-400';
+    statusEl.classList.remove('hidden');
+    setTimeout(() => { settingsModal.classList.add('hidden'); statusEl.classList.add('hidden'); }, 1500);
+  } catch (err) {
+    const statusEl = document.getElementById('cfgStatus');
+    statusEl.textContent = err.message || '保存失败';
+    statusEl.className = 'text-xs text-center text-red-500';
+    statusEl.classList.remove('hidden');
+  }
 });
 
 // --- Generate Modal ---

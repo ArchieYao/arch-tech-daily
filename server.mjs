@@ -9,7 +9,7 @@ import { summarizeArticles } from './lib/summarize.mjs';
 import { generateHighlights, generateReportTitle } from './lib/highlights.mjs';
 import { saveDigest, saveArticles, getDigest, getDigestList, setDigestStatus, setDigestHighlights, getStats, createShareToken, getDigestByShareToken, saveRssSources, getRssSources, saveTranslation, getTranslation, getTranslationMap, deleteTranslation, pruneTranslations, pruneOldDigests } from './lib/db.mjs';
 import { authMiddleware, initDefaultAdmin, verifyUser, verifySession, getSessionUser, changePassword, getClientIp, isLocked, getRemainingLockTime } from './lib/auth.mjs';
-import { saveApiConfig, loadApiConfig, loadApiConfigOrInit, API_PRESETS } from './lib/config.mjs';
+import { saveApiConfig, loadApiConfig, loadApiConfigOrInit, maskApiConfig, API_PRESETS } from './lib/config.mjs';
 import { translateArticle, translateArticleStream, batchTranslateArticles } from './lib/translate.mjs';
 import { WeRSSClient } from './lib/werss-client.mjs';
 import { sendFeishuAlert } from './lib/notify.mjs';
@@ -153,19 +153,27 @@ app.post('/api/auth/change-password', (req, res) => {
 app.get('/api/config', (req, res) => {
   const config = loadApiConfig();
   if (!config) return res.json({ ok: true, data: null });
-  const masked = { ...config };
-  if (masked.apiKey) masked.apiKeyMasked = masked.apiKey.slice(0, 6) + '***' + masked.apiKey.slice(-4);
-  delete masked.apiKey;
-  res.json({ ok: true, data: masked });
+  res.json({ ok: true, data: maskApiConfig(config) });
 });
 
 app.post('/api/config', (req, res) => {
   const { preset, apiKey, baseURL, model, schedules } = req.body || {};
-  if (!apiKey) return res.status(400).json({ ok: false, error: 'missing_api_key' });
-  const config = { preset: preset || 'auto', apiKey, baseURL: baseURL || '', model: model || '', schedules: schedules || [] };
+  const existing = loadApiConfig() || {};
+  const finalApiKey = (apiKey && String(apiKey).trim()) || existing.apiKey || '';
+  if (!finalApiKey) {
+    return res.status(400).json({ ok: false, error: 'missing_api_key', message: '请输入 API Key' });
+  }
+
+  const config = {
+    preset: preset || existing.preset || 'auto',
+    apiKey: finalApiKey,
+    baseURL: baseURL !== undefined && baseURL !== null ? String(baseURL) : (existing.baseURL || ''),
+    model: model !== undefined && model !== null ? String(model) : (existing.model || ''),
+    schedules: schedules !== undefined ? (schedules || []) : (existing.schedules || []),
+  };
   saveApiConfig(config);
   setupSchedules(config);
-  res.json({ ok: true, message: '配置已加密保存' });
+  res.json({ ok: true, message: '配置已加密保存', data: maskApiConfig(config) });
 });
 
 app.get('/api/presets', (req, res) => res.json({ ok: true, data: API_PRESETS }));
@@ -173,19 +181,24 @@ app.get('/api/presets', (req, res) => res.json({ ok: true, data: API_PRESETS }))
 // --- Test API connection ---
 app.post('/api/test-connection', asyncHandler(async (req, res) => {
   const { preset, apiKey, baseURL, model } = req.body || {};
-  if (!apiKey) return res.status(400).json({ ok: false, error: 'missing_api_key' });
+  const saved = loadApiConfig() || {};
+  const finalApiKey = (apiKey && String(apiKey).trim()) || saved.apiKey || '';
+  if (!finalApiKey) {
+    return res.status(400).json({ ok: false, error: 'missing_api_key', message: '请输入 API Key 或先保存配置' });
+  }
 
+  const finalPreset = preset || saved.preset || 'auto';
   const apiOpts = {
-    preset: preset === 'auto' ? undefined : preset,
-    baseURL: baseURL || API_PRESETS[preset]?.baseURL || '',
-    model: model || API_PRESETS[preset]?.defaultModel || '',
+    preset: finalPreset === 'auto' ? undefined : finalPreset,
+    baseURL: baseURL || saved.baseURL || API_PRESETS[finalPreset]?.baseURL || '',
+    model: model || saved.model || API_PRESETS[finalPreset]?.defaultModel || '',
   };
 
   try {
     // Import callAI from ai-client
     const { callAI } = await import('./lib/ai-client.mjs');
     // Simple test prompt
-    const result = await callAI('Hello, respond with "OK"', apiKey, apiOpts);
+    const result = await callAI('Hello, respond with "OK"', finalApiKey, apiOpts);
     if (result && result.length > 0) {
       res.json({ ok: true, message: 'Connection successful' });
     } else {
