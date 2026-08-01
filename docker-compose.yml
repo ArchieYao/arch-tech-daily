@@ -21,6 +21,8 @@ services:
       # 302 目标：/api/werss/open-ui。主站 HSTS 时必须 http://公网IP:8001（不要用同域名）
       - WERSS_UI_URL=${WERSS_UI_URL:-}
       - FEISHU_WEBHOOK_URL=${FEISHU_WEBHOOK_URL:-}
+      # 默认关闭 ai-daily 的凌晨全量刷新，避免与 WeRSS 内置任务重复；改为 true 可一键恢复
+      - ENABLE_MPS_DAILY_REFRESH=${ENABLE_MPS_DAILY_REFRESH:-false}
     volumes:
       - ai-daily-data:/app/data
       - ./we-mp-rss/data:/app/we-mp-rss/data:ro
@@ -41,15 +43,14 @@ services:
     ports:
       - "8001:8001"
     environment:
-      # 限制历史抓取页数，降低被风控风险（默认 5，这里改为 2）
-      - MAX_PAGE=2
+      # 限制历史抓取页数，降低被风控风险；可在 .env 中一键恢复
+      - MAX_PAGE=${WERSS_MAX_PAGE:-1}
       # Chromium 在服务器环境通常比 WebKit 更稳定，减少二维码登录线程崩溃概率
       - BROWSER_TYPE=chromium
       # 启用 we-mp-rss 内置定时任务（自动抓取订阅号新文章）
       - ENABLE_JOB=True
-      # 定时任务执行间隔（秒）：与内置 cron 配合；过小易与 Playwright 抢资源，过大则更新慢
-      # ai-daily 凌晨 00:00 会触发一次全量刷新；此前改为 7200 若配合 autoheal 易误判重启，保持 3600
-      - SPAN_INTERVAL=3600
+      # 定时任务执行间隔（秒）：默认 6 小时，避免公众号较多时持续触发微信限流
+      - SPAN_INTERVAL=${WERSS_SPAN_INTERVAL:-21600}
     volumes:
       - ./we-mp-rss/data:/app/data
     # 抓取时进程可能短暂忙，过严的探活 + autoheal 会反复重启容器，导致「永远刷不完」

@@ -579,25 +579,31 @@ function setupSchedules(config) {
 const savedConfig = loadApiConfigOrInit();
 if (savedConfig) setupSchedules(savedConfig);
 
-// ── 每日凌晨 0:00 自动刷新所有公众号文章 ─────────────────────────
-// 使用 5 分钟窗口（00:00~00:04）而非精确匹配 m===0，避免 setInterval 漂移导致跳过
-let lastMpsRefreshDate = '';
-const mpsRefreshTimer = setInterval(async () => {
-  const now = new Date();
-  const { year, month, day, hour: h, minute: m } = getShanghaiClock(now);
-  const todayKey = `${year}-${month}-${day}`;
-  if (h === 0 && m < 5 && lastMpsRefreshDate !== todayKey) {
-    lastMpsRefreshDate = todayKey;
-    console.log(`[mps-refresh] 开始每日凌晨自动刷新所有公众号 (${now.toISOString()})`);
-    try {
-      const result = await withWeRSSAuth(async (client, token) => await client.refreshAllMps(token));
-      console.log(`[mps-refresh] 刷新完成: ${result.updated}/${result.total} 个公众号`);
-    } catch (e) {
-      console.error(`[mps-refresh] 刷新失败: ${e.message}`);
+// ── 可选：每日凌晨 0:00 自动刷新所有公众号文章 ──────────────────────
+// 默认关闭以避免与 WeRSS 内置任务重复；设置 ENABLE_MPS_DAILY_REFRESH=true 可恢复
+const enableMpsDailyRefresh = /^(1|true|yes)$/i.test(process.env.ENABLE_MPS_DAILY_REFRESH || '');
+if (enableMpsDailyRefresh) {
+  // 使用 5 分钟窗口（00:00~00:04）而非精确匹配 m===0，避免 setInterval 漂移导致跳过
+  let lastMpsRefreshDate = '';
+  setInterval(async () => {
+    const now = new Date();
+    const { year, month, day, hour: h, minute: m } = getShanghaiClock(now);
+    const todayKey = `${year}-${month}-${day}`;
+    if (h === 0 && m < 5 && lastMpsRefreshDate !== todayKey) {
+      lastMpsRefreshDate = todayKey;
+      console.log(`[mps-refresh] 开始每日凌晨自动刷新所有公众号 (${now.toISOString()})`);
+      try {
+        const result = await withWeRSSAuth(async (client, token) => await client.refreshAllMps(token));
+        console.log(`[mps-refresh] 刷新完成: ${result.updated}/${result.total} 个公众号`);
+      } catch (e) {
+        console.error(`[mps-refresh] 刷新失败: ${e.message}`);
+      }
     }
-  }
-}, 60000);
-console.log('[mps-refresh] 已启用每日 00:00 自动刷新所有公众号');
+  }, 60000);
+  console.log('[mps-refresh] 已启用每日 00:00 自动刷新所有公众号');
+} else {
+  console.log('[mps-refresh] 已关闭每日全量刷新，使用 WeRSS 内置定时任务');
+}
 
 // Prune old data on startup (keep 30 days)
 setImmediate(() => {
