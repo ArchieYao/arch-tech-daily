@@ -503,7 +503,9 @@ document.getElementById('adminResetRssBtn')?.addEventListener('click', async () 
 });
 
 document.getElementById('adminGenerateBtn')?.addEventListener('click', async () => {
-  const res = await apiFetch('/api/digest/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+  const hours = parseInt(document.getElementById('adminScheduleHours')?.value, 10) || 24;
+  const topN = parseInt(document.getElementById('adminScheduleTopN')?.value, 10) || 15;
+  const res = await apiFetch('/api/digest/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ hours, topN }) });
   const data = await res.json();
   if (data.ok) { window.showToast?.('已开始生成'); watchStatus(); }
   else window.showToast?.(data.message || '生成失败', 'error');
@@ -1141,6 +1143,9 @@ document.getElementById('generateBtn').addEventListener('click', async () => {
     } else {
       document.getElementById('genConfigInfo').innerHTML = '⚠️ 尚未配置 API Key，请先点击 <b>设置</b> 按钮配置';
     }
+    const sched = (data.data?.schedules || []).find(s => s.enabled) || data.data?.schedules?.[0];
+    if (sched?.hours) document.getElementById('genHours').value = String(sched.hours);
+    if (sched?.topN) document.getElementById('genTopN').value = String(sched.topN);
   } catch {}
   genModal.classList.remove('hidden');
 });

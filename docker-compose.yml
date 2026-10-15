@@ -51,6 +51,11 @@ services:
       - ENABLE_JOB=True
       # 定时任务执行间隔（秒）：默认 6 小时，避免公众号较多时持续触发微信限流
       - SPAN_INTERVAL=${WERSS_SPAN_INTERVAL:-21600}
+      # 新文章第一次入库就抓正文。关闭后 RSS 只有标题，日报会按标题编摘要。
+      - GATHER.CONTENT=True
+      # 订阅号走微信读书。已有读书 Cookie 时，定时任务也会走这条路径。
+      - GATHER.MODEL=weread_mp
+      - WEREAD_CONTENT_INTERVAL=2
     volumes:
       - ./we-mp-rss/data:/app/data
     # 抓取时进程可能短暂忙，过严的探活 + autoheal 会反复重启容器，导致「永远刷不完」

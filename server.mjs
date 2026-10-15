@@ -995,8 +995,9 @@ app.post('/api/digest/generate', asyncHandler(async (req, res) => {
   const preset = req.body?.preset || config?.preset || 'auto';
   const baseURL = req.body?.baseURL || config?.baseURL || API_PRESETS[preset]?.baseURL || '';
   const model = req.body?.model || config?.model || API_PRESETS[preset]?.defaultModel || '';
-  const hours = req.body?.hours || 48;
-  const topN = req.body?.topN || 15;
+  const savedWindow = scheduledWindow(config);
+  const hours = Number(req.body?.hours) || savedWindow.hours;
+  const topN = Number(req.body?.topN) || savedWindow.topN;
   const apiOpts = { preset: preset === 'auto' ? undefined : preset, baseURL, model };
   res.json({ ok: true, message: '开始生成日报' });
   runDigestGeneration(apiKey, apiOpts, hours, topN).catch(err => {
@@ -1005,8 +1006,18 @@ app.post('/api/digest/generate', asyncHandler(async (req, res) => {
   });
 }));
 
+function scheduledWindow(config) {
+  const schedules = config?.schedules || [];
+  const sched = schedules.find(s => s.enabled) || schedules[0] || {};
+  return {
+    hours: Number(sched.hours) || 24,
+    topN: Number(sched.topN) || 15,
+  };
+}
+
 async function runDigestGeneration(apiKey, apiOpts, hours, topN) {
-  const dateStr = new Date().toISOString().slice(0, 10);
+  const clock = getShanghaiClock();
+  const dateStr = `${clock.year}-${String(clock.month).padStart(2, '0')}-${String(clock.day).padStart(2, '0')}`;
   updateGenerationState({ running: true, step: 'fetching', progress: '正在抓取 RSS 源...', startedAt: Date.now() });
   try {
     // Use custom RSS sources if available, otherwise use default (AI + 建筑科技)
